@@ -1,0 +1,18 @@
+{
+  "name": "keluarga-chat-api",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker that translates for Keluarga Chat via the Anthropic API",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "check": "wrangler deploy --dry-run --outdir .wrangler/dry-run"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.9.0"
+  },
+  "devDependencies": {
+    "wrangler": "^4.163.0"
+  },
+  "private": true,
+  "type": "module"
+}

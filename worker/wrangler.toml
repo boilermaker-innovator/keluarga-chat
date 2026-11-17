@@ -1,0 +1,20 @@
+# Cloudflare Worker that holds the Anthropic API key and does the translating.
+# Deploy with: npx wrangler deploy
+name = "keluarga-chat-api"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+# The page's address(es), comma-separated, no trailing slash. Update this to
+# your real Cloudflare Pages URL (and any custom domain) before deploying.
+ALLOWED_ORIGINS = "https://keluarga-chat.pages.dev"
+
+# Per-IP limit: 20 translations a minute is plenty for one person.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60

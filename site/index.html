@@ -1,0 +1,828 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keluarga Chat</title>
+<meta name="description" content="English ⇄ Bahasa Indonesia family translator with one-tap WhatsApp send.">
+<meta name="theme-color" content="#0f766e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M16 20h32a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H30l-10 8v-8h-4a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --surface-2: #efede7;
+    --text: #1d1d1b;
+    --muted: #64625c;
+    --border: #dcd9d0;
+    --accent: #0f766e;
+    --accent-text: #ffffff;
+    --accent-soft: #d8efec;
+    --wa: #1f8f4e;
+    --danger: #b42318;
+    --danger-soft: #fdecea;
+    --radius: 14px;
+    --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141513;
+      --surface: #1d1f1c;
+      --surface-2: #272a26;
+      --text: #ecebe6;
+      --muted: #a3a29b;
+      --border: #363a35;
+      --accent: #2dd4bf;
+      --accent-text: #0b2522;
+      --accent-soft: #173a36;
+      --wa: #34c26f;
+      --danger: #f97066;
+      --danger-soft: #3a1d1a;
+      --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141513; --surface: #1d1f1c; --surface-2: #272a26; --text: #ecebe6; --muted: #a3a29b;
+    --border: #363a35; --accent: #2dd4bf; --accent-text: #0b2522; --accent-soft: #173a36;
+    --wa: #34c26f; --danger: #f97066; --danger-soft: #3a1d1a; --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 640px;
+    margin: 0 auto;
+    padding: 16px 16px calc(32px + env(safe-area-inset-bottom));
+  }
+  header {
+    display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+    margin: 4px 0 16px;
+  }
+  h1 { font-size: 1.4rem; margin: 0; letter-spacing: -.01em; }
+  h1 small { display: block; font-size: .85rem; font-weight: 400; color: var(--muted); }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 16px;
+    margin-bottom: 14px;
+  }
+
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    min-height: 44px; padding: 10px 16px;
+    border-radius: 10px; border: 1px solid var(--border);
+    background: var(--surface-2); font-weight: 600;
+  }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn-wa { background: var(--wa); border-color: var(--wa); color: #fff; }
+  .btn-link { background: none; border: none; color: var(--accent); font-weight: 600; padding: 8px 4px; min-height: 0; }
+  .btn-danger { color: var(--danger); }
+  .btn-block { width: 100%; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > .grow { flex: 1 1 160px; }
+
+  .segmented {
+    display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+    background: var(--surface-2); border-radius: 12px; padding: 4px; gap: 4px;
+  }
+  .segmented button {
+    border: none; background: none; border-radius: 9px; padding: 9px 6px;
+    font-weight: 600; color: var(--muted); min-height: 40px;
+  }
+  .segmented button[aria-pressed="true"] { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+
+  label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: 6px; }
+  .field { margin-bottom: 12px; }
+  .hint { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  input[type=text], input[type=tel], input[type=password], input[type=url], select, textarea {
+    width: 100%; padding: 11px 12px; border-radius: 10px;
+    border: 1px solid var(--border); background: var(--surface);
+  }
+  textarea { min-height: 120px; resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 1px;
+  }
+
+  .chips { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
+  .chip {
+    flex: 0 0 auto; border: 1px solid var(--border); background: var(--surface);
+    border-radius: 999px; padding: 7px 14px; min-height: 40px; font-weight: 600; white-space: nowrap;
+  }
+  .chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+  .chip .sub { font-weight: 400; color: var(--muted); font-size: .85rem; margin-left: 4px; }
+
+  .to-line { font-size: .9rem; color: var(--muted); margin: 10px 0 8px; }
+  .to-line strong { color: var(--text); }
+
+  .counter { font-size: .8rem; color: var(--muted); text-align: right; margin-top: 4px; }
+  .counter.over { color: var(--danger); }
+
+  .result-text {
+    font-size: 1.15rem; line-height: 1.55; white-space: pre-wrap; word-wrap: break-word;
+    margin: 0 0 12px;
+  }
+  .check {
+    background: var(--surface-2); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px;
+    font-size: .95rem; white-space: pre-wrap;
+  }
+  .check b { display: block; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+  .error {
+    background: var(--danger-soft); color: var(--danger); border-radius: 10px;
+    padding: 10px 12px; margin-top: 12px; font-weight: 600;
+  }
+
+  .contact-list { list-style: none; padding: 0; margin: 0 0 12px; }
+  .contact-list li {
+    display: flex; align-items: center; gap: 8px; justify-content: space-between;
+    padding: 10px 0; border-bottom: 1px solid var(--border);
+  }
+  .contact-list li:last-child { border-bottom: none; }
+  .contact-list .who { min-width: 0; }
+  .contact-list .who div { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .contact-list .meta { font-size: .85rem; color: var(--muted); }
+
+  details > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after { content: "＋"; color: var(--muted); font-weight: 400; }
+  details[open] > summary::after { content: "－"; }
+  details[open] > summary { margin-bottom: 12px; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px;
+    font-weight: 600; font-size: .9rem; opacity: 0; transition: opacity .2s; pointer-events: none;
+  }
+  .toast.show { opacity: 1; }
+  [hidden] { display: none !important; }
+  .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Keluarga Chat <small>English ⇄ Bahasa Indonesia</small></h1>
+  </header>
+
+  <!-- Translate -->
+  <section class="card" aria-labelledby="translate-h">
+    <h2 id="translate-h" class="sr-only">Translate</h2>
+    <div class="segmented" role="group" aria-label="Translation direction">
+      <button type="button" data-dir="en-id" aria-pressed="true">English → Indonesian</button>
+      <button type="button" data-dir="id-en" aria-pressed="false">Indonesian → English</button>
+    </div>
+
+    <div id="to-block">
+      <p class="to-line" id="to-line"></p>
+      <div class="chips" id="contact-chips" role="group" aria-label="Choose who you're writing to"></div>
+      <div class="field" style="margin-top:12px">
+        <div class="segmented" role="group" aria-label="How polite" id="register-group">
+          <button type="button" data-reg="formal" aria-pressed="false">Formal</button>
+          <button type="button" data-reg="polite" aria-pressed="true">Polite</button>
+          <button type="button" data-reg="casual" aria-pressed="false">Casual</button>
+        </div>
+        <p class="hint" id="register-hint"></p>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="input" id="input-label">Your message in English</label>
+      <textarea id="input" placeholder="Hi Eyang, how are you? We miss you and hope to visit in December."></textarea>
+      <div class="counter" id="counter">0 / 2000</div>
+    </div>
+    <button type="button" class="btn btn-primary btn-block" id="translate-btn">Translate</button>
+    <div class="error" id="error" role="alert" hidden></div>
+  </section>
+
+  <!-- Result -->
+  <section class="card" id="result" aria-live="polite" hidden>
+    <h2 id="result-h">Indonesian</h2>
+    <p class="result-text" id="result-text"></p>
+    <div class="check" id="back-wrap" hidden><b>What it says</b><span id="back-text"></span></div>
+    <div class="check" id="notes-wrap" hidden><b>Notes</b><span id="notes-text"></span></div>
+    <div class="row">
+      <button type="button" class="btn btn-wa grow" id="wa-btn">Send on WhatsApp</button>
+      <button type="button" class="btn grow" id="copy-btn">Copy</button>
+    </div>
+  </section>
+
+  <!-- Contacts -->
+  <section class="card">
+    <details id="contacts-details">
+      <summary>Family contacts</summary>
+      <ul class="contact-list" id="contact-list"></ul>
+      <p class="hint" id="no-contacts">No contacts yet. Add someone below.</p>
+
+      <form id="contact-form" autocomplete="off">
+        <h2 id="form-h">Add a contact</h2>
+        <input type="hidden" id="c-id">
+        <div class="field">
+          <label for="c-name">Name</label>
+          <input type="text" id="c-name" required maxlength="60" placeholder="e.g. Eyang Putri">
+        </div>
+        <div class="field">
+          <label for="c-rel">Relationship</label>
+          <select id="c-rel"></select>
+        </div>
+        <div class="field">
+          <label for="c-title">What you call them</label>
+          <input type="text" id="c-title" maxlength="40" placeholder="e.g. Eyang">
+          <p class="hint">Used as their title in the Indonesian, e.g. "Eyang sudah makan?"</p>
+        </div>
+        <div class="field">
+          <label for="c-reg">Default politeness</label>
+          <select id="c-reg">
+            <option value="formal">Formal: elders, grandparents, in-laws</option>
+            <option value="polite">Polite: parents, aunts and uncles, older siblings</option>
+            <option value="casual">Casual: younger siblings, cousins, friends</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="c-phone">WhatsApp number</label>
+          <input type="tel" id="c-phone" inputmode="tel" maxlength="24" placeholder="+62 812 3456 7890">
+          <p class="hint" id="c-phone-hint">With country code. Indonesian numbers starting 08 are converted to +62 for you.</p>
+        </div>
+        <div class="row">
+          <button type="submit" class="btn btn-primary grow" id="c-save">Save contact</button>
+          <button type="button" class="btn grow" id="c-cancel" hidden>Cancel</button>
+        </div>
+      </form>
+
+      <div class="row" style="margin-top:14px">
+        <button type="button" class="btn-link" id="export-btn">Export contacts</button>
+        <button type="button" class="btn-link" id="import-btn">Import contacts</button>
+        <input type="file" id="import-file" accept="application/json,.json" hidden>
+      </div>
+      <p class="hint">Contacts are saved only in this browser on this device. Use export and import to move them.</p>
+    </details>
+  </section>
+
+  <!-- Settings -->
+  <section class="card">
+    <details id="settings-details">
+      <summary>Settings</summary>
+      <div class="field">
+        <label for="s-url">Translator address (Worker URL)</label>
+        <input type="url" id="s-url" placeholder="https://keluarga-chat-api.yourname.workers.dev">
+      </div>
+      <div class="field">
+        <label for="s-pass">Family passcode</label>
+        <input type="password" id="s-pass" autocomplete="current-password">
+        <p class="hint">Remembered on this device only.</p>
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="s-save">Save settings</button>
+    </details>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  // Set this once after deploying the Worker so new devices only need the passcode.
+  // Settings on the page override it.
+  const DEFAULT_WORKER_URL = "";
+  const MAX_CHARS = 2000;
+
+  // value, label, default title, default register
+  const RELATIONSHIPS = [
+    ["kakek", "Kakek (grandfather)", "Kakek", "formal"],
+    ["nenek", "Nenek (grandmother)", "Nenek", "formal"],
+    ["eyang", "Eyang (grandparent, Javanese)", "Eyang", "formal"],
+    ["mbah", "Mbah (grandparent, Javanese)", "Mbah", "formal"],
+    ["opa", "Opa (grandfather)", "Opa", "formal"],
+    ["oma", "Oma (grandmother)", "Oma", "formal"],
+    ["ibu-mertua", "Ibu mertua (mother-in-law)", "Ibu", "formal"],
+    ["bapak-mertua", "Bapak mertua (father-in-law)", "Bapak", "formal"],
+    ["ibu", "Ibu (mother)", "Ibu", "polite"],
+    ["bapak", "Bapak (father)", "Bapak", "polite"],
+    ["tante", "Tante (aunt)", "Tante", "polite"],
+    ["om", "Om (uncle)", "Om", "polite"],
+    ["mbak", "Mbak (older sister / female cousin)", "Mbak", "polite"],
+    ["mas", "Mas (older brother / male cousin)", "Mas", "polite"],
+    ["kakak", "Kak (older sibling)", "Kak", "polite"],
+    ["adik", "Adik (younger sibling)", "", "casual"],
+    ["sepupu", "Sepupu (cousin)", "", "casual"],
+    ["teman", "Teman (friend)", "", "casual"],
+    ["lain", "Other", "", "polite"],
+  ];
+  const REL = Object.fromEntries(RELATIONSHIPS.map(([v, label, title, reg]) => [v, { label, title, reg }]));
+
+  const REGISTER_HINTS = {
+    formal: "Formal: very respectful, uses their title instead of \"you\", no slang.",
+    polite: "Polite: respectful and warm, uses their title instead of \"you\".",
+    casual: "Casual: relaxed everyday Indonesian (aku / kamu).",
+  };
+
+  // ---------- storage (never throws) ----------
+  const store = {
+    get(key, fallback) {
+      try { const v = localStorage.getItem(key); return v === null ? fallback : JSON.parse(v); }
+      catch { return fallback; }
+    },
+    set(key, value) {
+      try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+      catch { return false; }
+    },
+  };
+
+  const state = {
+    direction: "en-id",
+    register: "polite",
+    contactId: null,        // selected contact, or null for "no one in particular"
+    contacts: sanitizeContacts(store.get("kc.contacts", [])),
+    settings: store.get("kc.settings", { url: "", passcode: "" }),
+    last: null,             // last successful result
+    busy: false,
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- helpers ----------
+  function uid() {
+    return (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(16).slice(2));
+  }
+
+  function sanitizeContacts(list) {
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter((c) => c && typeof c.name === "string" && c.name.trim())
+      .map((c) => ({
+        id: typeof c.id === "string" ? c.id : uid(),
+        name: c.name.trim().slice(0, 60),
+        rel: REL[c.rel] ? c.rel : "lain",
+        title: typeof c.title === "string" ? c.title.trim().slice(0, 40) : "",
+        reg: ["formal", "polite", "casual"].includes(c.reg) ? c.reg : "polite",
+        phone: typeof c.phone === "string" ? c.phone.slice(0, 24) : "",
+      }));
+  }
+
+  // Digits only, international format, as wa.me expects. "08..." is an
+  // Indonesian mobile number, so it becomes "628...".
+  function waNumber(raw) {
+    let d = String(raw || "").replace(/[^\d]/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    else if (d.startsWith("08")) d = "62" + d.slice(1);
+    return d.length >= 8 ? d : "";
+  }
+
+  function workerUrl() {
+    const base = (state.settings.url || DEFAULT_WORKER_URL || "").trim().replace(/\/+$/, "");
+    return base ? base + "/translate" : "";
+  }
+
+  function selectedContact() {
+    return state.contacts.find((c) => c.id === state.contactId) || null;
+  }
+
+  let toastTimer;
+  function toast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 1800);
+  }
+
+  function showError(msg) {
+    const el = $("error");
+    el.textContent = msg || "";
+    el.hidden = !msg;
+  }
+
+  // ---------- rendering ----------
+  function renderDirection() {
+    document.querySelectorAll("[data-dir]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.dir === state.direction)));
+    const toId = state.direction === "en-id";
+    $("to-block").hidden = !toId;
+    $("input-label").textContent = toId ? "Your message in English" : "Paste the Indonesian message";
+    $("input").placeholder = toId
+      ? "Hi Eyang, how are you? We miss you and hope to visit in December."
+      : "Eyang udh sehat kok, gpp. Kapan pulang?";
+    $("input").lang = toId ? "en" : "id";
+  }
+
+  function renderRegister() {
+    document.querySelectorAll("[data-reg]").forEach((b) =>
+      b.setAttribute("aria-pressed", String(b.dataset.reg === state.register)));
+    $("register-hint").textContent = REGISTER_HINTS[state.register];
+  }
+
+  function renderChips() {
+    const wrap = $("contact-chips");
+    wrap.replaceChildren();
+
+    const anyone = document.createElement("button");
+    anyone.type = "button";
+    anyone.className = "chip";
+    anyone.textContent = "Anyone";
+    anyone.setAttribute("aria-pressed", String(state.contactId === null));
+    anyone.addEventListener("click", () => selectContact(null));
+    wrap.append(anyone);
+
+    for (const c of state.contacts) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "chip";
+      b.setAttribute("aria-pressed", String(c.id === state.contactId));
+      b.textContent = c.name;
+      if (c.title && c.title.toLowerCase() !== c.name.toLowerCase()) {
+        const sub = document.createElement("span");
+        sub.className = "sub";
+        sub.textContent = c.title;
+        b.append(sub);
+      }
+      b.addEventListener("click", () => selectContact(c.id));
+      wrap.append(b);
+    }
+
+    const add = document.createElement("button");
+    add.type = "button";
+    add.className = "chip";
+    add.textContent = "＋ Add";
+    add.addEventListener("click", () => {
+      $("contacts-details").open = true;
+      $("c-name").focus();
+    });
+    wrap.append(add);
+
+    const c = selectedContact();
+    const line = $("to-line");
+    line.replaceChildren();
+    if (c) {
+      line.append("Writing to ");
+      const s = document.createElement("strong");
+      s.textContent = c.name;
+      line.append(s, ` · ${REL[c.rel].label}`);
+    } else {
+      line.textContent = "Who are you writing to?";
+    }
+  }
+
+  function renderContactList() {
+    const ul = $("contact-list");
+    ul.replaceChildren();
+    $("no-contacts").hidden = state.contacts.length > 0;
+    for (const c of state.contacts) {
+      const li = document.createElement("li");
+      const who = document.createElement("div");
+      who.className = "who";
+      const name = document.createElement("div");
+      name.textContent = c.name;
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const num = waNumber(c.phone);
+      meta.textContent = [REL[c.rel].label, c.reg, num ? "+" + num : "no WhatsApp number"].join(" · ");
+      who.append(name, meta);
+
+      const actions = document.createElement("div");
+      actions.className = "row";
+      actions.style.flexWrap = "nowrap";
+      const edit = document.createElement("button");
+      edit.type = "button"; edit.className = "btn-link"; edit.textContent = "Edit";
+      edit.setAttribute("aria-label", `Edit ${c.name}`);
+      edit.addEventListener("click", () => startEdit(c.id));
+      const del = document.createElement("button");
+      del.type = "button"; del.className = "btn-link btn-danger"; del.textContent = "Delete";
+      del.setAttribute("aria-label", `Delete ${c.name}`);
+      del.addEventListener("click", () => deleteContact(c.id));
+      actions.append(edit, del);
+
+      li.append(who, actions);
+      ul.append(li);
+    }
+  }
+
+  function renderResult() {
+    const r = state.last;
+    $("result").hidden = !r;
+    if (!r) return;
+    $("result-h").textContent = r.direction === "en-id" ? "Indonesian" : "English";
+    $("result-text").textContent = r.translation;
+    $("result-text").lang = r.direction === "en-id" ? "id" : "en";
+    $("back-wrap").hidden = !r.back_translation;
+    $("back-text").textContent = r.back_translation;
+    $("notes-wrap").hidden = !r.notes;
+    $("notes-text").textContent = r.notes;
+
+    const waBtn = $("wa-btn");
+    if (r.direction === "en-id") {
+      waBtn.hidden = false;
+      const c = r.contactId ? state.contacts.find((x) => x.id === r.contactId) : null;
+      waBtn.textContent = c && waNumber(c.phone) ? `Send to ${c.name} on WhatsApp` : "Open in WhatsApp";
+    } else {
+      waBtn.hidden = true;
+    }
+  }
+
+  function renderCounter() {
+    const n = $("input").value.length;
+    const el = $("counter");
+    el.textContent = `${n} / ${MAX_CHARS}`;
+    el.classList.toggle("over", n > MAX_CHARS);
+  }
+
+  function renderAll() {
+    renderDirection();
+    renderRegister();
+    renderChips();
+    renderContactList();
+    renderResult();
+    renderCounter();
+  }
+
+  // ---------- actions ----------
+  function selectContact(id) {
+    state.contactId = id;
+    const c = selectedContact();
+    if (c) state.register = c.reg;
+    store.set("kc.lastContact", id);
+    renderChips();
+    renderRegister();
+  }
+
+  async function doTranslate() {
+    if (state.busy) return;
+    showError("");
+    const text = $("input").value.trim();
+    if (!text) { showError("Type a message first."); return; }
+    if (text.length > MAX_CHARS) { showError(`Messages are limited to ${MAX_CHARS} characters.`); return; }
+
+    const url = workerUrl();
+    if (!url || !state.settings.passcode) {
+      showError("Add the translator address and family passcode in Settings first.");
+      $("settings-details").open = true;
+      (url ? $("s-pass") : $("s-url")).focus();
+      return;
+    }
+
+    const c = state.direction === "en-id" ? selectedContact() : null;
+    const payload = {
+      text,
+      direction: state.direction,
+      register: state.register,
+      title: c ? (c.title || c.name) : "",
+    };
+
+    state.busy = true;
+    const btn = $("translate-btn");
+    btn.disabled = true;
+    btn.textContent = "Translating…";
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Family-Passcode": state.settings.passcode },
+        body: JSON.stringify(payload),
+      });
+      let data = null;
+      try { data = await res.json(); } catch { /* non-JSON error */ }
+      if (!res.ok) {
+        if (res.status === 401) $("settings-details").open = true;
+        throw new Error((data && data.error) || `The translator returned an error (${res.status}).`);
+      }
+      state.last = { ...data, direction: payload.direction, contactId: c ? c.id : null };
+      renderResult();
+      $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
+    } catch (err) {
+      const msg = err instanceof TypeError
+        ? "Couldn't reach the translator. Check your connection and the Worker address in Settings."
+        : err.message;
+      showError(msg);
+    } finally {
+      state.busy = false;
+      btn.disabled = false;
+      btn.textContent = "Translate";
+    }
+  }
+
+  function sendWhatsApp() {
+    const r = state.last;
+    if (!r) return;
+    const c = r.contactId ? state.contacts.find((x) => x.id === r.contactId) : null;
+    const num = c ? waNumber(c.phone) : "";
+    const link = `https://wa.me/${num}?text=${encodeURIComponent(r.translation)}`;
+    window.open(link, "_blank", "noopener");
+  }
+
+  async function copyResult() {
+    if (!state.last) return;
+    const text = state.last.translation;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Copied");
+    } catch {
+      // Fallback for browsers without clipboard permission.
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.setAttribute("readonly", "");
+      ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.append(ta);
+      ta.select();
+      try { document.execCommand("copy"); toast("Copied"); } catch { toast("Couldn't copy"); }
+      ta.remove();
+    }
+  }
+
+  // ---------- contacts ----------
+  function saveContacts() {
+    if (!store.set("kc.contacts", state.contacts)) {
+      toast("Couldn't save: this browser is blocking storage");
+    }
+  }
+
+  function resetForm() {
+    $("contact-form").reset();
+    $("c-id").value = "";
+    $("form-h").textContent = "Add a contact";
+    $("c-save").textContent = "Save contact";
+    $("c-cancel").hidden = true;
+    applyRelDefaults(true);
+  }
+
+  // Fill title and politeness from the relationship. `force` overwrites what
+  // is there; otherwise only fields the user hasn't typed into change.
+  let titleTouched = false;
+  function applyRelDefaults(force) {
+    const r = REL[$("c-rel").value];
+    if (!r) return;
+    if (force || !titleTouched) $("c-title").value = r.title;
+    $("c-reg").value = r.reg;
+    if (force) titleTouched = false;
+  }
+
+  function startEdit(id) {
+    const c = state.contacts.find((x) => x.id === id);
+    if (!c) return;
+    $("c-id").value = c.id;
+    $("c-name").value = c.name;
+    $("c-rel").value = c.rel;
+    $("c-title").value = c.title;
+    $("c-reg").value = c.reg;
+    $("c-phone").value = c.phone;
+    titleTouched = true;
+    $("form-h").textContent = `Edit ${c.name}`;
+    $("c-save").textContent = "Save changes";
+    $("c-cancel").hidden = false;
+    $("c-name").focus();
+  }
+
+  function deleteContact(id) {
+    const c = state.contacts.find((x) => x.id === id);
+    if (!c || !confirm(`Delete ${c.name}?`)) return;
+    state.contacts = state.contacts.filter((x) => x.id !== id);
+    if (state.contactId === id) state.contactId = null;
+    saveContacts();
+    if ($("c-id").value === id) resetForm();
+    renderAll();
+  }
+
+  function onSubmitContact(e) {
+    e.preventDefault();
+    const name = $("c-name").value.trim();
+    if (!name) { $("c-name").focus(); return; }
+    const phone = $("c-phone").value.trim();
+    if (phone && !waNumber(phone)) {
+      $("c-phone-hint").textContent = "That number looks too short. Include the country code, e.g. +62 812 3456 7890.";
+      $("c-phone").focus();
+      return;
+    }
+    const contact = {
+      id: $("c-id").value || uid(),
+      name,
+      rel: $("c-rel").value,
+      title: $("c-title").value.trim(),
+      reg: $("c-reg").value,
+      phone,
+    };
+    const i = state.contacts.findIndex((x) => x.id === contact.id);
+    if (i >= 0) state.contacts[i] = contact; else state.contacts.push(contact);
+    saveContacts();
+    if (state.contactId === contact.id || i < 0) {
+      state.contactId = contact.id;
+      state.register = contact.reg;
+      store.set("kc.lastContact", contact.id);
+    }
+    resetForm();
+    renderAll();
+    toast(i >= 0 ? "Contact updated" : "Contact added");
+  }
+
+  function exportContacts() {
+    const blob = new Blob([JSON.stringify({ app: "keluarga-chat", version: 1, contacts: state.contacts }, null, 2)],
+      { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "keluarga-chat-contacts.json";
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }
+
+  async function importContacts(file) {
+    try {
+      const data = JSON.parse(await file.text());
+      const incoming = sanitizeContacts(Array.isArray(data) ? data : data.contacts);
+      if (!incoming.length) { toast("No contacts found in that file"); return; }
+      const byId = new Map(state.contacts.map((c) => [c.id, c]));
+      for (const c of incoming) byId.set(c.id, c);
+      state.contacts = [...byId.values()];
+      saveContacts();
+      renderAll();
+      toast(`Imported ${incoming.length} contact${incoming.length === 1 ? "" : "s"}`);
+    } catch {
+      toast("That file isn't a contacts export");
+    }
+  }
+
+  // ---------- settings ----------
+  function loadSettingsForm() {
+    $("s-url").value = state.settings.url || DEFAULT_WORKER_URL;
+    $("s-pass").value = state.settings.passcode || "";
+  }
+
+  function saveSettings() {
+    state.settings = { url: $("s-url").value.trim(), passcode: $("s-pass").value };
+    if (store.set("kc.settings", state.settings)) toast("Settings saved");
+    else toast("Saved for this visit only: storage is blocked");
+    showError("");
+  }
+
+  // ---------- wire up ----------
+  function init() {
+    const sel = $("c-rel");
+    for (const [value, label] of RELATIONSHIPS) {
+      const o = document.createElement("option");
+      o.value = value; o.textContent = label;
+      sel.append(o);
+    }
+    sel.value = "eyang";
+    applyRelDefaults(true);
+
+    const lastContact = store.get("kc.lastContact", null);
+    if (state.contacts.some((c) => c.id === lastContact)) {
+      state.contactId = lastContact;
+      state.register = selectedContact().reg;
+    }
+
+    document.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => {
+      state.direction = b.dataset.dir;
+      renderDirection();
+      $("input").focus();
+    }));
+    document.querySelectorAll("[data-reg]").forEach((b) => b.addEventListener("click", () => {
+      state.register = b.dataset.reg;
+      renderRegister();
+    }));
+
+    $("input").addEventListener("input", renderCounter);
+    $("input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); doTranslate(); }
+    });
+    $("translate-btn").addEventListener("click", doTranslate);
+    $("wa-btn").addEventListener("click", sendWhatsApp);
+    $("copy-btn").addEventListener("click", copyResult);
+
+    $("contact-form").addEventListener("submit", onSubmitContact);
+    $("c-rel").addEventListener("change", () => applyRelDefaults(false));
+    $("c-title").addEventListener("input", () => { titleTouched = true; });
+    $("c-phone").addEventListener("input", () => {
+      $("c-phone-hint").textContent = "With country code. Indonesian numbers starting 08 are converted to +62 for you.";
+    });
+    $("c-cancel").addEventListener("click", resetForm);
+    $("export-btn").addEventListener("click", exportContacts);
+    $("import-btn").addEventListener("click", () => $("import-file").click());
+    $("import-file").addEventListener("change", (e) => {
+      const f = e.target.files && e.target.files[0];
+      if (f) importContacts(f);
+      e.target.value = "";
+    });
+
+    $("s-save").addEventListener("click", saveSettings);
+    loadSettingsForm();
+    if (!workerUrl() || !state.settings.passcode) $("settings-details").open = true;
+    if (!state.contacts.length) $("contacts-details").open = true;
+
+    renderAll();
+  }
+
+  init();
+})();
+</script>
+</body>
+</html>
