@@ -4,6 +4,8 @@ A small, private translator for writing to family in Indonesia: English ⇄ Baha
 
 Live at **https://keluarga-chat-worker.jgwynne7.workers.dev**
 
+Deployed via Cloudflare Workers Builds
+
 ```
                     one Cloudflare Worker: keluarga-chat-worker
 your phone ──▶  /              → site/index.html (static files)
