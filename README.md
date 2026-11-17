@@ -2,14 +2,18 @@
 
 A small, private translator for writing to family in Indonesia: English ⇄ Bahasa Indonesia, polite forms for elders, and one-tap send to WhatsApp.
 
+Live at **https://keluarga-chat-worker.jgwynne7.workers.dev**
+
 ```
-site/index.html  (your phone)  ──POST /translate──▶  Cloudflare Worker  ──▶  Anthropic API
-  contacts, UI, WhatsApp button                        holds the API key
-  (Cloudflare Pages)                                   (Worker secret)
+                    one Cloudflare Worker: keluarga-chat-worker
+your phone ──▶  /              → site/index.html (static files)
+           ──▶  /api/translate → worker/src/index.js ──▶ Anthropic API
+                                 (holds the API key as a secret)
 ```
 
-- **`site/index.html`** is one plain HTML file with no build step, hosted on Cloudflare Pages. It knows only the Worker's address and never sees the API key.
-- **`worker/`** is a small Cloudflare Worker. It checks the family passcode, then calls Claude through the Anthropic API using a key stored as an encrypted Worker secret.
+- **`wrangler.toml`** (repo root) configures one Worker that does both jobs: it serves `site/` as static files and runs `worker/src/index.js` for anything under `/api/`.
+- **`site/index.html`** is one plain HTML file with no build step. It calls its own `/api/translate`, so there's no Worker address to type in, and it never sees the API key.
+- **`worker/src/index.js`** checks the family passcode, then calls Claude through the Anthropic API using a key stored as an encrypted Worker secret.
 
 ## What it does
 
@@ -31,7 +35,7 @@ site/index.html  (your phone)  ──POST /translate──▶  Cloudflare Worker
 |---|---|
 | API key exposure | The key is only a Worker secret (`wrangler secret put`). It's never in the page, the repo or the browser. |
 | Strangers using your credit | A **family passcode** (also a Worker secret) is required on every request and compared in constant time. The page remembers it on your device. |
-| Other websites calling the Worker | **CORS allowlist** (`ALLOWED_ORIGINS`): only your Pages site gets a browser response. |
+| Other websites calling the Worker | **Origin check**: only the Worker's own address and the origins in `ALLOWED_ORIGINS` get a response. |
 | Floods or runaway cost | **20 requests a minute per IP** (Cloudflare rate-limit binding) and a **2,000-character** cap per message. |
 | Prompt injection in messages | The message is wrapped in `<message>` tags and the model is told to translate it, never follow it. Output is constrained to a JSON schema. |
 | Contacts' privacy | Phone numbers stay in your browser. The Worker receives only the message text, direction, register and the title (e.g. "Eyang"), not names or numbers. |
@@ -40,63 +44,56 @@ The Worker uses the model `claude-opus-5-5` at **low effort**, which suits short
 
 ## Setup
 
-You need a Cloudflare account, an Anthropic API key (console.anthropic.com) and Node.js 18 or later.
+You need a Cloudflare account, an Anthropic API key (console.anthropic.com) and Node.js 18 or later. Everything runs from the **repo root**.
 
-### 1. Deploy the Worker
+### Option A: Cloudflare deploys from GitHub (current setup)
+
+The Worker `keluarga-chat-worker` is connected to this repo, so each push to `main` deploys it. Cloudflare reads `wrangler.toml` at the repo root, installs `package.json`, and runs `npx wrangler deploy`. In the dashboard (Workers & Pages → keluarga-chat-worker → Settings → Build), the build settings should be:
+
+- **Root directory:** `/` (empty)
+- **Build command:** empty
+- **Deploy command:** `npx wrangler deploy`
+
+Add the two secrets once, under Workers & Pages → keluarga-chat-worker → Settings → Variables and Secrets, as type **Secret**:
+
+- `ANTHROPIC_API_KEY`: your Anthropic API key
+- `FAMILY_PASSCODE`: the family passcode
+
+Or from a terminal:
 
 ```bash
-cd worker
 npm install
 npx wrangler login
-
-# Secrets: you'll be prompted to paste each value. They're never written to disk.
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put FAMILY_PASSCODE
+```
 
+### Option B: deploy by hand
+
+```bash
+npm install
+npx wrangler login
+npx wrangler secret put ANTHROPIC_API_KEY   # first time only
+npx wrangler secret put FAMILY_PASSCODE     # first time only
 npx wrangler deploy
 ```
 
-Note the URL it prints, e.g. `https://keluarga-chat-api.<your-subdomain>.workers.dev`.
+### Using it
 
-### 2. Deploy the page to Cloudflare Pages
+Open https://keluarga-chat-worker.jgwynne7.workers.dev on your phone. Under **Settings**, enter the family passcode and tap **Save settings**. Add your family under **Family contacts**. On iPhone, Share → *Add to Home Screen* makes it feel like an app.
 
-```bash
-cd ..   # repo root
-npx wrangler pages deploy site --project-name keluarga-chat
-```
-
-On the first run it creates the project. Your page is then at `https://keluarga-chat.pages.dev`. If that name is taken, use another name and note the URL. You can also connect this GitHub repo in the Cloudflare dashboard (Workers & Pages → Create → Pages → Connect to Git) with **build command: none** and **output directory: `site`**, so every push deploys.
-
-### 3. Allow the page to call the Worker
-
-In `worker/wrangler.toml`, set `ALLOWED_ORIGINS` to your Pages URL, plus any custom domain, comma-separated with no trailing slash. Then redeploy:
-
-```bash
-cd worker && npx wrangler deploy
-```
-
-### 4. Open the page and connect it
-
-Open the Pages URL on your phone. Under **Settings**, enter the Worker URL and the family passcode, then tap **Save settings**. Add your family under **Family contacts**. On iPhone, Share → *Add to Home Screen* makes it feel like an app.
-
-Optional: put the Worker URL in `DEFAULT_WORKER_URL` near the top of the script in `site/index.html` and redeploy. Then a new device only needs the passcode.
+If you add a custom domain, the Worker accepts requests from its own address automatically. Add a domain to `ALLOWED_ORIGINS` in `wrangler.toml` only when a page on a *different* address needs to call the API.
 
 ### Local development
 
 ```bash
-cd worker
 cp .dev.vars.example .dev.vars    # fill in a real key and a passcode; .dev.vars is git-ignored
-npx wrangler dev                  # Worker on http://localhost:8787
-
-# in another terminal, from the repo root
-python3 -m http.server 8788 --directory site   # page on http://localhost:8788
+npx wrangler dev                  # page and API on http://localhost:8787
 ```
-
-In the page's Settings, use `http://localhost:8787` as the Worker URL.
 
 ## Worker API
 
-`POST /translate`
+`POST /api/translate`
 
 Headers: `Content-Type: application/json`, `X-Family-Passcode: <passcode>`
 

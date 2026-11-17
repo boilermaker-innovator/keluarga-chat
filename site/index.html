@@ -275,13 +275,14 @@
     <details id="settings-details">
       <summary>Settings</summary>
       <div class="field">
-        <label for="s-url">Translator address (Worker URL)</label>
-        <input type="url" id="s-url" placeholder="https://keluarga-chat-api.yourname.workers.dev">
-      </div>
-      <div class="field">
         <label for="s-pass">Family passcode</label>
         <input type="password" id="s-pass" autocomplete="current-password">
         <p class="hint">Remembered on this device only.</p>
+      </div>
+      <div class="field">
+        <label for="s-url">Translator address (optional)</label>
+        <input type="url" id="s-url" placeholder="Leave empty to use this site">
+        <p class="hint">Only needed if the translator runs on a different address from this page.</p>
       </div>
       <button type="button" class="btn btn-primary btn-block" id="s-save">Save settings</button>
     </details>
@@ -293,9 +294,9 @@
 (() => {
   "use strict";
 
-  // Set this once after deploying the Worker so new devices only need the passcode.
-  // Settings on the page override it.
-  const DEFAULT_WORKER_URL = "";
+  // The page and the API are served by the same Worker, so the API is at
+  // this site's own /api/translate. Settings can point elsewhere if needed.
+  const API_PATH = "/api/translate";
   const MAX_CHARS = 2000;
 
   // value, label, default title, default register
@@ -381,8 +382,8 @@
   }
 
   function workerUrl() {
-    const base = (state.settings.url || DEFAULT_WORKER_URL || "").trim().replace(/\/+$/, "");
-    return base ? base + "/translate" : "";
+    const base = (state.settings.url || "").trim().replace(/\/+$/, "");
+    return base ? base + API_PATH : API_PATH;
   }
 
   function selectedContact() {
@@ -564,10 +565,10 @@
     if (text.length > MAX_CHARS) { showError(`Messages are limited to ${MAX_CHARS} characters.`); return; }
 
     const url = workerUrl();
-    if (!url || !state.settings.passcode) {
-      showError("Add the translator address and family passcode in Settings first.");
+    if (!state.settings.passcode) {
+      showError("Enter the family passcode in Settings first.");
       $("settings-details").open = true;
-      (url ? $("s-pass") : $("s-url")).focus();
+      $("s-pass").focus();
       return;
     }
 
@@ -600,7 +601,7 @@
       $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (err) {
       const msg = err instanceof TypeError
-        ? "Couldn't reach the translator. Check your connection and the Worker address in Settings."
+        ? "Couldn't reach the translator. Check your connection and try again."
         : err.message;
       showError(msg);
     } finally {
@@ -752,7 +753,7 @@
 
   // ---------- settings ----------
   function loadSettingsForm() {
-    $("s-url").value = state.settings.url || DEFAULT_WORKER_URL;
+    $("s-url").value = state.settings.url || "";
     $("s-pass").value = state.settings.passcode || "";
   }
 
@@ -815,7 +816,7 @@
 
     $("s-save").addEventListener("click", saveSettings);
     loadSettingsForm();
-    if (!workerUrl() || !state.settings.passcode) $("settings-details").open = true;
+    if (!state.settings.passcode) $("settings-details").open = true;
     if (!state.contacts.length) $("contacts-details").open = true;
 
     renderAll();

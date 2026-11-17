@@ -1,0 +1,26 @@
+# One Worker serves both the page (site/) and the translate API (/api/*).
+# Deploy from the repo root with: npx wrangler deploy
+name = "keluarga-chat-worker"
+main = "worker/src/index.js"
+compatibility_date = "2026-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = "./site"
+binding = "ASSETS"
+# /api/* goes to the Worker code; everything else is served from site/.
+run_worker_first = ["/api/*"]
+
+[vars]
+# Page addresses allowed to call the API, comma-separated, no trailing slash.
+# Requests from the Worker's own address are always allowed.
+ALLOWED_ORIGINS = "https://keluarga-chat-worker.jgwynne7.workers.dev,https://keluarga-chat.pages.dev"
+
+# Per-IP limit: 20 translations a minute is plenty for one person.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+
+  [ratelimits.simple]
+  limit = 20
+  period = 60

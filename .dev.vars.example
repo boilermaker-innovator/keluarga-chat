@@ -1,0 +1,4 @@
+# Copy to .dev.vars (repo root) for `npx wrangler dev`. .dev.vars is git-ignored.
+ANTHROPIC_API_KEY=sk-ant-...
+FAMILY_PASSCODE=choose-a-passcode
+ALLOWED_ORIGINS=http://localhost:8787

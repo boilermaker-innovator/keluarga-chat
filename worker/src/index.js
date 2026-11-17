@@ -1,7 +1,8 @@
-// Keluarga Chat translation Worker.
+// Keluarga Chat Worker.
 //
-// The only route is POST /translate. The browser page sends the text plus
-// the family passcode; this Worker checks the passcode, then calls the
+// One Worker serves the page (site/, via the ASSETS binding) and the API.
+// The API route is POST /api/translate. The page sends the text plus the
+// family passcode; this Worker checks the passcode, then calls the
 // Anthropic API with the key stored as a Worker secret. The key never
 // leaves Cloudflare.
 //
@@ -9,8 +10,10 @@
 //   ANTHROPIC_API_KEY  - your Anthropic API key
 //   FAMILY_PASSCODE    - the passcode you type into the page once
 // Vars (wrangler.toml):
-//   ALLOWED_ORIGINS    - comma-separated list of page origins allowed to call
+//   ALLOWED_ORIGINS    - comma-separated list of other page origins allowed
+//                        to call (the Worker's own address is always allowed)
 // Bindings (wrangler.toml):
+//   ASSETS             - the static files in site/
 //   RATE_LIMITER       - Cloudflare rate-limit binding (per IP)
 
 import Anthropic from "@anthropic-ai/sdk";
@@ -66,14 +69,20 @@ Keep notes short and only include them when they help. Do not add greetings, sig
 
 export default {
   async fetch(request, env) {
-    const cors = corsHeaders(request, env);
+    const url = new URL(request.url);
+
+    // Anything outside /api/ is the page itself.
+    if (!url.pathname.startsWith("/api/")) {
+      return env.ASSETS ? env.ASSETS.fetch(request) : new Response("Not found.", { status: 404 });
+    }
+
+    const cors = corsHeaders(request, env, url);
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: cors ? 204 : 403, headers: cors ?? {} });
     }
 
-    const url = new URL(request.url);
-    if (url.pathname !== "/translate") {
+    if (url.pathname !== "/api/translate") {
       return json({ error: "Not found." }, 404, cors);
     }
     if (request.method !== "POST") {
@@ -217,12 +226,15 @@ function errorResponse(err, cors) {
 }
 
 // Returns CORS headers when the request's Origin is allowed, otherwise null.
-function corsHeaders(request, env) {
+// Browsers send Origin on every POST, including same-origin ones, so the
+// Worker's own address is always allowed.
+function corsHeaders(request, env, url) {
   const origin = request.headers.get("Origin");
   const allowed = (env.ALLOWED_ORIGINS ?? "")
     .split(",")
     .map((o) => o.trim().replace(/\/$/, ""))
     .filter(Boolean);
+  allowed.push(url.origin);
   if (!origin || !allowed.includes(origin)) return null;
   return {
     "Access-Control-Allow-Origin": origin,
