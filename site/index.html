@@ -21,6 +21,9 @@
     --wa: #1f8f4e;
     --danger: #b42318;
     --danger-soft: #fdecea;
+    --warn: #d97706;
+    --warn-soft: #fef6e7;
+    --warn-text: #92400e;
     --radius: 14px;
     --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
     color-scheme: light dark;
@@ -39,6 +42,9 @@
       --wa: #34c26f;
       --danger: #f97066;
       --danger-soft: #3a1d1a;
+      --warn: #f59e0b;
+      --warn-soft: #33270f;
+      --warn-text: #fbbf24;
       --shadow: none;
     }
   }
@@ -46,6 +52,7 @@
     --bg: #141513; --surface: #1d1f1c; --surface-2: #272a26; --text: #ecebe6; --muted: #a3a29b;
     --border: #363a35; --accent: #2dd4bf; --accent-text: #0b2522; --accent-soft: #173a36;
     --wa: #34c26f; --danger: #f97066; --danger-soft: #3a1d1a; --shadow: none;
+    --warn: #f59e0b; --warn-soft: #33270f; --warn-text: #fbbf24;
   }
 
   * { box-sizing: border-box; }
@@ -140,6 +147,22 @@
     font-size: .95rem; white-space: pre-wrap;
   }
   .check b { display: block; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-bottom: 2px; }
+
+  .tone {
+    background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 12px;
+    padding: 12px; margin-bottom: 14px;
+  }
+  .tone p { margin: 0 0 10px; font-size: .95rem; }
+  .tone b { display: block; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--warn-text); margin-bottom: 2px; }
+  .tone .gentler { font-size: 1.05rem; }
+  .tone small { display: block; color: var(--muted); font-size: .85rem; margin-top: 2px; }
+
+  .suggest-h { display: block; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin: 4px 0 6px; font-weight: 700; }
+  .suggestions { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+  .suggestion {
+    text-align: left; border: 1px solid var(--accent); background: var(--accent-soft);
+    border-radius: 12px; padding: 10px 12px; min-height: 44px; font-weight: 500;
+  }
   .error {
     background: var(--danger-soft); color: var(--danger); border-radius: 10px;
     padding: 10px 12px; margin-top: 12px; font-weight: 600;
@@ -189,8 +212,8 @@
 
     <div id="to-block">
       <p class="to-line" id="to-line"></p>
-      <div class="chips" id="contact-chips" role="group" aria-label="Choose who you're writing to"></div>
-      <div class="field" style="margin-top:12px">
+      <div class="chips" id="contact-chips" role="group" aria-label="Choose the family member"></div>
+      <div class="field" style="margin-top:12px" id="register-field">
         <div class="segmented" role="group" aria-label="How polite" id="register-group">
           <button type="button" data-reg="formal" aria-pressed="false">Formal</button>
           <button type="button" data-reg="polite" aria-pressed="true">Polite</button>
@@ -211,10 +234,22 @@
 
   <!-- Result -->
   <section class="card" id="result" aria-live="polite" hidden>
+    <div class="tone" id="tone" hidden>
+      <p><b>⚠️ Tone check</b><span id="tone-issue"></span></p>
+      <p><b>Gentler</b><span class="gentler" id="tone-gentler" lang="id"></span><small id="tone-gentler-back"></small></p>
+      <div class="row">
+        <button type="button" class="btn btn-primary grow" id="tone-use">Use gentler version</button>
+        <button type="button" class="btn grow" id="tone-keep">Keep mine</button>
+      </div>
+    </div>
     <h2 id="result-h">Indonesian</h2>
     <p class="result-text" id="result-text"></p>
     <div class="check" id="back-wrap" hidden><b>What it says</b><span id="back-text"></span></div>
     <div class="check" id="notes-wrap" hidden><b>Notes</b><span id="notes-text"></span></div>
+    <div id="suggest-wrap" hidden>
+      <span class="suggest-h">Tap a reply to write it</span>
+      <div class="suggestions" id="suggestions"></div>
+    </div>
     <div class="row">
       <button type="button" class="btn btn-wa grow" id="wa-btn">Send on WhatsApp</button>
       <button type="button" class="btn grow" id="copy-btn">Copy</button>
@@ -414,7 +449,7 @@
     document.querySelectorAll("[data-dir]").forEach((b) =>
       b.setAttribute("aria-pressed", String(b.dataset.dir === state.direction)));
     const toId = state.direction === "en-id";
-    $("to-block").hidden = !toId;
+    $("register-field").hidden = !toId;
     $("input-label").textContent = toId ? "Your message in English" : "Paste the Indonesian message";
     $("input").placeholder = toId
       ? "Hi Eyang, how are you? We miss you and hope to visit in December."
@@ -470,12 +505,12 @@
     const line = $("to-line");
     line.replaceChildren();
     if (c) {
-      line.append("Writing to ");
+      line.append(state.direction === "en-id" ? "Writing to " : "From ");
       const s = document.createElement("strong");
       s.textContent = c.name;
       line.append(s, ` · ${REL[c.rel].label}`);
     } else {
-      line.textContent = "Who are you writing to?";
+      line.textContent = state.direction === "en-id" ? "Who are you writing to?" : "Who sent it?";
     }
   }
 
@@ -523,6 +558,31 @@
     $("back-wrap").hidden = !r.back_translation;
     $("back-text").textContent = r.back_translation;
     $("notes-wrap").hidden = !r.notes;
+
+    // Tone check (English -> Indonesian)
+    const tone = r.tone_check;
+    const showTone = r.direction === "en-id" && tone && tone.ok === false && tone.gentler_translation
+      && !r.toneDismissed && !r.gentlerUsed;
+    $("tone").hidden = !showTone;
+    if (showTone) {
+      $("tone-issue").textContent = tone.issue || "This might come across as too blunt.";
+      $("tone-gentler").textContent = tone.gentler_translation;
+      $("tone-gentler-back").textContent = tone.gentler_back_translation ? "“" + tone.gentler_back_translation + "”" : "";
+    }
+
+    // Reply suggestions (Indonesian -> English)
+    const list = r.direction === "id-en" && Array.isArray(r.reply_suggestions) ? r.reply_suggestions : [];
+    $("suggest-wrap").hidden = list.length === 0;
+    const box = $("suggestions");
+    box.replaceChildren();
+    for (const text of list) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "suggestion";
+      b.textContent = text;
+      b.addEventListener("click", () => useSuggestion(text));
+      box.append(b);
+    }
     $("notes-text").textContent = r.notes;
 
     const waBtn = $("wa-btn");
@@ -576,7 +636,7 @@
       return;
     }
 
-    const c = state.direction === "en-id" ? selectedContact() : null;
+    const c = selectedContact();
     const payload = {
       text,
       direction: state.direction,
@@ -600,7 +660,7 @@
         if (res.status === 401) $("settings-details").open = true;
         throw new Error((data && data.error) || `The translator returned an error (${res.status}).`);
       }
-      state.last = { ...data, direction: payload.direction, contactId: c ? c.id : null };
+      state.last = { ...data, direction: payload.direction, contactId: c ? c.id : null, toneDismissed: false, gentlerUsed: false };
       renderResult();
       $("result").scrollIntoView({ behavior: "smooth", block: "nearest" });
     } catch (err) {
@@ -613,6 +673,45 @@
       btn.disabled = false;
       btn.textContent = "Translate";
     }
+  }
+
+  // Tapping a suggested reply switches to English -> Indonesian with the
+  // same person selected and the reply in the box, ready to edit and translate.
+  function useSuggestion(text) {
+    const r = state.last;
+    state.direction = "en-id";
+    if (r && r.contactId && state.contacts.some((c) => c.id === r.contactId)) {
+      state.contactId = r.contactId;
+      state.register = selectedContact().reg;
+    }
+    state.last = null;
+    $("input").value = text;
+    showError("");
+    renderAll();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    $("input").focus({ preventScroll: true });
+    toast("Reply ready: tap Translate");
+  }
+
+  function useGentler() {
+    const r = state.last;
+    if (!r || !r.tone_check) return;
+    r.translation = r.tone_check.gentler_translation;
+    r.back_translation = r.tone_check.gentler_back_translation;
+    r.notes = "";
+    r.gentlerUsed = true;
+    if (r.tone_check.gentler_english) {
+      $("input").value = r.tone_check.gentler_english;
+      renderCounter();
+    }
+    renderResult();
+    toast("Switched to the gentler version");
+  }
+
+  function keepMine() {
+    if (!state.last) return;
+    state.last.toneDismissed = true;
+    renderResult();
   }
 
   function sendWhatsApp() {
@@ -788,6 +887,7 @@
     document.querySelectorAll("[data-dir]").forEach((b) => b.addEventListener("click", () => {
       state.direction = b.dataset.dir;
       renderDirection();
+      renderChips();
       $("input").focus();
     }));
     document.querySelectorAll("[data-reg]").forEach((b) => b.addEventListener("click", () => {
@@ -801,6 +901,8 @@
     });
     $("translate-btn").addEventListener("click", doTranslate);
     $("wa-btn").addEventListener("click", sendWhatsApp);
+    $("tone-use").addEventListener("click", useGentler);
+    $("tone-keep").addEventListener("click", keepMine);
     $("copy-btn").addEventListener("click", copyResult);
 
     $("contact-form").addEventListener("submit", onSubmitContact);

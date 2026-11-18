@@ -28,6 +28,8 @@ your phone ──▶  /              → site/index.html (static files)
   
   Each relationship sets a default, and you can switch it per message.
 - **Relationships included.** Kakek, Nenek, Eyang, Mbah, Opa, Oma, Ibu/Bapak mertua, Ibu, Bapak, Tante, Om, Mbak, Mas, Kak, Adik, Sepupu, Teman and Other. "What you call them" can be anything (*Eyang Putri*, *Mama*, *Pakde*).
+- **Reply suggestions.** When you translate a family message into English, 2–3 short replies appear. Tap one and it's put in the English box, with the same person selected, ready to edit and translate.
+- **Tone check.** When you write in English, a warning appears if the message could sound rude, too blunt or too casual for that person (especially elders), with a gentler version already translated. "Use gentler version" swaps it in; "Keep mine" dismisses the warning.
 - **Check-back line.** Every English → Indonesian result also comes back translated into English, so you can confirm what you're about to send.
 - **One-tap WhatsApp.** "Send to Eyang Putri on WhatsApp" opens `wa.me/<number>?text=…` with the message filled in. You still tap send in WhatsApp. Numbers starting `08` are treated as Indonesian and converted to `+62`.
 
@@ -104,14 +106,28 @@ Headers: `Content-Type: application/json`, `X-Family-Passcode: <passcode>`
 ```
 
 - `direction`: `en-id` or `id-en`.
-- `register`: `formal`, `polite` or `casual` (used for `en-id`).
-- `title`: what you call the person (used for `en-id`).
+- `register`: `formal`, `polite` or `casual`.
+- `title`: what you call the person (who you're writing to, or who the message is from).
 
 Response:
 
 ```json
-{ "translation": "Eyang, apa kabar?", "back_translation": "Eyang, how are you?", "notes": "" }
+{
+  "translation": "Eyang, kirim fotonya sekarang.",
+  "back_translation": "Eyang, send the photo now.",
+  "notes": "",
+  "reply_suggestions": [],
+  "tone_check": {
+    "ok": false,
+    "issue": "Sounds like an order, which can feel disrespectful to an elder.",
+    "gentler_english": "Eyang, when you have a moment, could you please send the photo?",
+    "gentler_translation": "Eyang, kalau sempat, boleh tolong kirim fotonya?",
+    "gentler_back_translation": "Eyang, if you have time, could you please send the photo?"
+  }
+}
 ```
+
+`reply_suggestions` (up to 3) is filled only for `id-en`; `tone_check` is only ever not-ok for `en-id`. Both come from the same single Claude call as the translation.
 
 Errors come back as `{ "error": "<friendly message>" }` with these status codes: 400 (bad input), 401 (wrong passcode), 403 (origin not allowed), 422 (declined), 429 (rate limited), and 502/503 (upstream problems).
 
@@ -119,6 +135,7 @@ Errors come back as `{ "error": "<friendly message>" }` with these status codes:
 
 - [x] Translator page with contacts, registers, check-back line and WhatsApp send
 - [x] Worker with secret key, passcode, CORS allowlist, rate limit and size cap
+- [x] Reply suggestions and tone check
 - [ ] Saved phrases (e.g. *Selamat Idul Fitri, mohon maaf lahir dan batin*) and greetings for Lebaran, birthdays and Natal
 - [ ] Recent translations history (on-device)
 - [ ] Voice input on mobile

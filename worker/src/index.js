@@ -42,10 +42,44 @@ const OUTPUT_SCHEMA = {
       description:
         "One or two short sentences on anything worth knowing (slang or abbreviations expanded, a word with no exact equivalent, why a title was used). Empty string if nothing to say.",
     },
+    reply_suggestions: {
+      type: "array",
+      items: { type: "string" },
+      description:
+        "For id-en only: two or three short, natural English replies the user could send back. Empty array for en-id, or when the message needs no reply.",
+    },
+    tone_check: {
+      type: "object",
+      description:
+        "For en-id only: whether the user's English message could land badly with this person. For id-en, set ok to true and leave the strings empty.",
+      properties: {
+        ok: { type: "boolean", description: "true unless there is a clear tone problem." },
+        issue: {
+          type: "string",
+          description: "When ok is false: one short sentence naming the problem, in plain English. Otherwise empty.",
+        },
+        gentler_english: {
+          type: "string",
+          description: "When ok is false: the user's message rewritten in English to be gentler, keeping its meaning. Otherwise empty.",
+        },
+        gentler_translation: {
+          type: "string",
+          description: "When ok is false: the Indonesian translation of gentler_english, following the same register rules. Otherwise empty.",
+        },
+        gentler_back_translation: {
+          type: "string",
+          description: "When ok is false: plain English rendering of gentler_translation. Otherwise empty.",
+        },
+      },
+      required: ["ok", "issue", "gentler_english", "gentler_translation", "gentler_back_translation"],
+      additionalProperties: false,
+    },
   },
-  required: ["translation", "back_translation", "notes"],
+  required: ["translation", "back_translation", "notes", "reply_suggestions", "tone_check"],
   additionalProperties: false,
 };
+
+const MAX_SUGGESTIONS = 3;
 
 const SYSTEM_PROMPT = `You translate WhatsApp messages inside one family, between English and Bahasa Indonesia. The person using you writes English and has Indonesian-speaking relatives, including elders.
 
@@ -60,12 +94,16 @@ English to Indonesian (en-id):
 - The person's title is what the sender calls them (for example Kakek, Nenek, Eyang, Mbah, Opa, Oma, Ibu, Bapak, Om, Tante, Mas, Mbak). When the English says "you" to that person, use the title as the pronoun in formal and polite registers. When the English names the person, use the title.
 - Refer to the sender as "saya" in formal, and "aku" or "saya" in polite as feels natural; "aku" in casual.
 - back_translation: render your Indonesian back into plain English, including how the person is addressed, so the sender can check it.
+- tone_check: decide whether the sender's message could come across as rude, too blunt, or too casual for this person and register. Only flag clear problems, such as sounding like an order or a complaint, no respect shown to an elder, slang or teasing to a grandparent or in-law, or words that are harsh in Indonesian even if mild in English. Ordinary short messages are fine; most messages should get ok: true. When you flag one, give a one-sentence issue, a gentler English version that keeps the sender's meaning and voice, and its Indonesian translation and back-translation. The main translation must still be a faithful translation of what the sender wrote.
+- reply_suggestions: empty array.
 
 Indonesian to English (id-en):
 - Translate into clear, natural English. Expand texting abbreviations and slang (for example gpp, otw, bgt, udh, sm) and regional or Javanese words, and mention notable ones in notes.
 - Leave back_translation as an empty string.
+- reply_suggestions: two or three short English replies the sender of this message would be glad to get, in the user's warm, friendly voice and suited to the person's title if given. Make them genuinely different (for example a direct answer, a warm reply, and a question back). Do not invent specific facts such as dates, places or plans; keep anything like that general ("soon", "I'll let you know"). Use an empty array if the message clearly needs no reply.
+- tone_check: ok true, other fields empty strings.
 
-Keep notes short and only include them when they help. Do not add greetings, sign-offs, or content that is not in the original.`;
+Keep notes short and only include them when they help. In translation, do not add greetings, sign-offs, or content that is not in the original (a gentler version in tone_check may add a short greeting or please).`;
 
 export default {
   async fetch(request, env) {
@@ -146,7 +184,7 @@ async function translate(env, { text, direction, register, title }) {
   const context =
     direction === "en-id"
       ? `Direction: en-id (English to Indonesian)\nRegister: ${register}\nPerson's title: ${title || "(none given; use a neutral, respectful form)"}`
-      : "Direction: id-en (Indonesian to English)";
+      : `Direction: id-en (Indonesian to English)\nThe message is from: ${title || "(not given)"}\nRegister the user uses with them: ${register}`;
 
   const response = await client.beta.messages.create({
     model: MODEL,
@@ -187,11 +225,39 @@ async function translate(env, { text, direction, register, title }) {
     throw new TranslationError("The translation came back in an unexpected format. Please try again.", 502);
   }
 
-  return {
-    translation: String(parsed.translation ?? ""),
-    back_translation: String(parsed.back_translation ?? ""),
-    notes: String(parsed.notes ?? ""),
+  return normalizeResult(parsed, direction);
+}
+
+// Keep the page's contract stable whatever the model returns.
+function normalizeResult(parsed, direction) {
+  const str = (v) => (typeof v === "string" ? v.trim() : "");
+  const result = {
+    translation: str(parsed.translation),
+    back_translation: str(parsed.back_translation),
+    notes: str(parsed.notes),
+    reply_suggestions: [],
+    tone_check: { ok: true, issue: "", gentler_english: "", gentler_translation: "", gentler_back_translation: "" },
   };
+
+  if (direction === "id-en" && Array.isArray(parsed.reply_suggestions)) {
+    result.reply_suggestions = parsed.reply_suggestions
+      .map(str)
+      .filter(Boolean)
+      .map((s) => s.slice(0, 300))
+      .slice(0, MAX_SUGGESTIONS);
+  }
+
+  const tone = parsed.tone_check;
+  if (direction === "en-id" && tone && tone.ok === false && str(tone.gentler_translation)) {
+    result.tone_check = {
+      ok: false,
+      issue: str(tone.issue),
+      gentler_english: str(tone.gentler_english),
+      gentler_translation: str(tone.gentler_translation),
+      gentler_back_translation: str(tone.gentler_back_translation),
+    };
+  }
+  return result;
 }
 
 class TranslationError extends Error {
