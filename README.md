@@ -131,11 +131,23 @@ Response:
 
 Errors come back as `{ "error": "<friendly message>" }` with these status codes: 400 (bad input), 401 (wrong passcode), 403 (origin not allowed), 422 (declined), 429 (rate limited), and 502/503 (upstream problems).
 
+## WhatsApp webhook (receive only)
+
+`/webhook` receives messages from Meta's WhatsApp Cloud API (via Dualhook coexistence). Nothing is sent back to WhatsApp.
+
+- `GET /webhook`: Meta's verification handshake. Returns `hub.challenge` when `hub.verify_token` matches the `WHATSAPP_VERIFY_TOKEN` secret, otherwise 403.
+- `POST /webhook`: replies 200 immediately, then in the background translates each **text** message Indonesian → English with the same Claude call as the page and saves it to the `INBOX` KV namespace. Status updates and media are ignored.
+- Each saved message (key `msg:<newest-first>:<message id>`) is JSON: `{ id, from, name, original, english, notes, time, error }`. The original is saved first, so if translation fails it's still there with `error` set.
+- Optional `WHATSAPP_APP_SECRET` secret (your Meta app secret): when set, POSTs without a valid `X-Hub-Signature-256` are refused. Recommended, since without it anyone who finds the URL could post fake messages.
+- `INBOX` has no id in `wrangler.toml`; Wrangler creates the namespace on the first deploy. Messages expire after a year.
+
 ## Roadmap
 
 - [x] Translator page with contacts, registers, check-back line and WhatsApp send
 - [x] Worker with secret key, passcode, CORS allowlist, rate limit and size cap
 - [x] Reply suggestions and tone check
+- [x] WhatsApp webhook: receive, translate and store incoming messages
+- [ ] Inbox page showing received WhatsApp messages
 - [ ] Saved phrases (e.g. *Selamat Idul Fitri, mohon maaf lahir dan batin*) and greetings for Lebaran, birthdays and Natal
 - [ ] Recent translations history (on-device)
 - [ ] Voice input on mobile

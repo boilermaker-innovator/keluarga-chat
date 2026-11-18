@@ -6,15 +6,25 @@
 // Anthropic API with the key stored as a Worker secret. The key never
 // leaves Cloudflare.
 //
+// It also receives WhatsApp messages from Meta's Cloud API at /webhook
+// (GET = Meta's verification handshake, POST = incoming messages). Each
+// incoming text is translated Indonesian -> English and saved to KV for the
+// inbox page. Nothing is sent back to WhatsApp.
+//
 // Secrets (set with `npx wrangler secret put <NAME>`):
-//   ANTHROPIC_API_KEY  - your Anthropic API key
-//   FAMILY_PASSCODE    - the passcode you type into the page once
+//   ANTHROPIC_API_KEY      - your Anthropic API key
+//   FAMILY_PASSCODE        - the passcode you type into the page once
+//   WHATSAPP_VERIFY_TOKEN  - any string you choose; type the same one into
+//                            the webhook settings in Meta / Dualhook
+//   WHATSAPP_APP_SECRET    - optional: your Meta app secret. When set, POSTs
+//                            without a valid X-Hub-Signature-256 are refused.
 // Vars (wrangler.toml):
 //   ALLOWED_ORIGINS    - comma-separated list of other page origins allowed
 //                        to call (the Worker's own address is always allowed)
 // Bindings (wrangler.toml):
 //   ASSETS             - the static files in site/
 //   RATE_LIMITER       - Cloudflare rate-limit binding (per IP)
+//   INBOX              - KV namespace holding received WhatsApp messages
 
 import Anthropic from "@anthropic-ai/sdk";
 
@@ -106,8 +116,12 @@ Indonesian to English (id-en):
 Keep notes short and only include them when they help. In translation, do not add greetings, sign-offs, or content that is not in the original (a gentler version in tone_check may add a short greeting or please).`;
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url);
+
+    if (url.pathname === "/webhook") {
+      return handleWebhook(request, env, ctx, url);
+    }
 
     // Anything outside /api/ is the page itself.
     if (!url.pathname.startsWith("/api/")) {
@@ -177,6 +191,142 @@ export default {
     }
   },
 };
+
+// ---------------------------------------------------------------------------
+// WhatsApp webhook (Meta Cloud API, via Dualhook coexistence). Receive only.
+// ---------------------------------------------------------------------------
+
+const INBOX_TTL_SECONDS = 60 * 60 * 24 * 365; // keep messages for a year
+const MAX_TS = 9999999999999; // for newest-first KV keys
+
+async function handleWebhook(request, env, ctx, url) {
+  // 1. Verification handshake: Meta calls GET /webhook?hub.mode=subscribe
+  //    &hub.verify_token=...&hub.challenge=... and expects the challenge back.
+  if (request.method === "GET") {
+    const mode = url.searchParams.get("hub.mode");
+    const token = url.searchParams.get("hub.verify_token") ?? "";
+    const challenge = url.searchParams.get("hub.challenge") ?? "";
+    if (
+      mode === "subscribe" &&
+      env.WHATSAPP_VERIFY_TOKEN &&
+      (await passcodeMatches(token, env.WHATSAPP_VERIFY_TOKEN))
+    ) {
+      return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
+    }
+    return new Response("Forbidden", { status: 403 });
+  }
+
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
+  // 2. Incoming messages. Read the raw body (needed for the signature check).
+  const raw = await request.text();
+
+  if (env.WHATSAPP_APP_SECRET) {
+    const sig = request.headers.get("X-Hub-Signature-256") ?? "";
+    if (!(await signatureMatches(raw, sig, env.WHATSAPP_APP_SECRET))) {
+      console.warn("WhatsApp webhook: bad or missing signature, ignored.");
+      return new Response("Forbidden", { status: 403 });
+    }
+  }
+
+  let payload;
+  try {
+    payload = JSON.parse(raw);
+  } catch {
+    // Still 200 so Meta doesn't keep retrying something we can't read.
+    return new Response("OK", { status: 200 });
+  }
+
+  const messages = extractTextMessages(payload);
+  if (messages.length) {
+    if (!env.INBOX) {
+      console.error("WhatsApp webhook: INBOX KV binding is missing; messages not saved.");
+    } else {
+      // Reply to Meta right away; translate and save in the background.
+      ctx.waitUntil(Promise.all(messages.map((m) => saveAndTranslate(env, m))));
+    }
+  }
+  return new Response("OK", { status: 200 });
+}
+
+// Pulls text messages out of Meta's webhook shape:
+// { entry: [ { changes: [ { value: { contacts: [...], messages: [...] } } ] } ] }
+// Status updates (sent/delivered/read) and non-text messages are skipped.
+function extractTextMessages(payload) {
+  const out = [];
+  for (const entry of payload?.entry ?? []) {
+    for (const change of entry?.changes ?? []) {
+      const value = change?.value ?? {};
+      const names = new Map(
+        (value.contacts ?? []).map((c) => [c?.wa_id, c?.profile?.name ?? ""]),
+      );
+      for (const msg of value.messages ?? []) {
+        if (msg?.type !== "text" || typeof msg.text?.body !== "string") continue;
+        const text = msg.text.body.trim();
+        if (!text) continue;
+        const seconds = Number(msg.timestamp);
+        out.push({
+          id: String(msg.id ?? crypto.randomUUID()),
+          from: String(msg.from ?? ""),
+          name: String(names.get(msg.from) ?? "").slice(0, 80),
+          original: text.slice(0, MAX_INPUT_CHARS),
+          time: Number.isFinite(seconds) ? new Date(seconds * 1000).toISOString() : new Date().toISOString(),
+        });
+      }
+    }
+  }
+  return out;
+}
+
+// Saves the original first (so nothing is lost if translation fails), then
+// translates and saves again with the English filled in.
+// Key: msg:<newest-first number>:<WhatsApp message id>. Meta can deliver the
+// same message twice; the id in the key makes the second save a harmless
+// overwrite.
+async function saveAndTranslate(env, m) {
+  const key = `msg:${String(MAX_TS - Date.parse(m.time)).padStart(13, "0")}:${m.id}`;
+  const record = { ...m, english: "", notes: "", error: "" };
+  const put = (r) =>
+    env.INBOX.put(key, JSON.stringify(r), {
+      expirationTtl: INBOX_TTL_SECONDS,
+      // Small copy in the key's metadata so a list() can show the inbox
+      // without reading every message.
+      metadata: { from: r.from, name: r.name, time: r.time, english: r.english.slice(0, 200) },
+    });
+
+  try {
+    await put(record);
+    if (!env.ANTHROPIC_API_KEY) throw new Error("ANTHROPIC_API_KEY is not set.");
+    const result = await translate(env, {
+      text: m.original,
+      direction: "id-en",
+      register: "polite",
+      title: m.name,
+    });
+    record.english = result.translation;
+    record.notes = result.notes;
+  } catch (err) {
+    console.error(`WhatsApp webhook: translation failed for ${m.id}:`, err?.message ?? err);
+    record.error = "Translation failed.";
+  }
+  try {
+    await put(record);
+  } catch (err) {
+    console.error(`WhatsApp webhook: could not save ${m.id}:`, err?.message ?? err);
+  }
+}
+
+// Meta signs the raw body with HMAC-SHA256 using the app secret and sends
+// "sha256=<hex>" in X-Hub-Signature-256.
+async function signatureMatches(raw, header, secret) {
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const mac = await crypto.subtle.sign("HMAC", key, enc.encode(raw));
+  const expected = "sha256=" + [...new Uint8Array(mac)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  return passcodeMatches(header.toLowerCase(), expected);
+}
 
 async function translate(env, { text, direction, register, title }) {
   const client = new Anthropic({ apiKey: env.ANTHROPIC_API_KEY });
