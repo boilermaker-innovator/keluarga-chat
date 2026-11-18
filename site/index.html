@@ -167,6 +167,8 @@
     font-weight: 600; font-size: .9rem; opacity: 0; transition: opacity .2s; pointer-events: none;
   }
   .toast.show { opacity: 1; }
+  .about-link { text-align: center; font-size: .85rem; margin: 4px 0 0; }
+  .about-link a { color: var(--muted); }
   [hidden] { display: none !important; }
   .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 </style>
@@ -287,6 +289,8 @@
       <button type="button" class="btn btn-primary btn-block" id="s-save">Save settings</button>
     </details>
   </section>
+
+  <p class="about-link"><a href="/about">About Keluarga Chat</a></p>
 </main>
 <div class="toast" id="toast" role="status"></div>
 
