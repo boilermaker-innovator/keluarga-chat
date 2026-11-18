@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>iTabs | Keluarga Chat</title>
+    <meta name="description" content="Keluarga Chat (Family Chat): chat with your overseas family in WhatsApp, in their language.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        :root {
+            --bg-primary: #0a0a0f; --bg-secondary: #12121a; --bg-tertiary: #1e1e2e;
+            --text-primary: #ffffff; --text-secondary: #9090b0;
+            --accent: #7c3aed; --accent2: #06b6d4; --i-button: #f59e0b;
+            --card-radius: 16px; --transition: 0.2s ease;
+        }
+        html, body { height: 100%; overflow: hidden; }
+        body { font-family: 'Inter', -apple-system, sans-serif; background: #050508; color: var(--text-primary); line-height: 1.5; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .container { max-width: 430px; width: 100%; height: 100%; max-height: 850px; margin: 0 auto; display: flex; flex-direction: column; min-height: 0; background: var(--bg-secondary); border: 1px solid rgba(255,255,255,0.1); border-radius: 20px; overflow: hidden; box-shadow: 0 0 40px rgba(0,0,0,0.6); }
+
+        .biz-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--bg-secondary); border-bottom: 1px solid rgba(255,255,255,0.06); position: relative; z-index: 90; }
+        .biz-name { font-size: 13px; font-weight: 700; color: var(--text-primary); }
+        .biz-location { font-size: 11px; color: var(--text-secondary); margin-top: 1px; }
+        .contact-pill { padding: 7px 14px; background: var(--accent); border: none; border-radius: 99px; color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; }
+
+        .progress-container { display: flex; gap: 4px; padding: 8px 16px 6px; background: var(--bg-primary); }
+        .progress-segment { flex: 1; height: 3px; background: rgba(255,255,255,0.2); border-radius: 2px; transition: background var(--transition); }
+        .progress-segment.viewed { background: rgba(255,255,255,0.6); }
+        .progress-segment.active { background: var(--accent); }
+
+        .cards-wrapper { flex: 1; position: relative; overflow: hidden; min-height: 0; }
+        .card { position: absolute; inset: 0; display: flex; flex-direction: column; opacity: 0; transform: translateX(100%); transition: all 0.3s ease; pointer-events: none; border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; overflow: hidden; }
+        .card.active { opacity: 1; transform: translateX(0); pointer-events: all; }
+        .card.prev { opacity: 0; transform: translateX(-100%); }
+
+        .card-hero { padding: 20px; min-height: 36%; display: flex; flex-direction: column; justify-content: flex-end; position: relative; cursor: pointer; }
+        .hero-default { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+        .hero-purple  { background: linear-gradient(135deg, #4c1d95 0%, #1e1b4b 100%); }
+        .hero-cyan    { background: linear-gradient(135deg, #164e63 0%, #0c4a6e 100%); }
+        .hero-amber   { background: linear-gradient(135deg, #78350f 0%, #431407 100%); }
+        .hero-green   { background: linear-gradient(135deg, #14532d 0%, #052e16 100%); }
+        .hero-red     { background: linear-gradient(135deg, #7f1d1d 0%, #450a0a 100%); }
+
+        .card-tag { font-size: 10px; font-weight: 700; letter-spacing: 0.15em; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px; }
+        .tag-cyan { color: #67e8f9; } .tag-amber { color: #fcd34d; } .tag-green { color: #6ee7b7; } .tag-red { color: #fca5a5; } .tag-purple { color: #a78bfa; }
+        .card-headline { font-size: clamp(20px, 5vw, 26px); font-weight: 700; line-height: 1.25; }
+        .hero-default em { color: #cbd5e1; font-style: normal; } .hero-purple em { color: #a78bfa; font-style: normal; }
+        .hero-cyan em { color: #67e8f9; font-style: normal; } .hero-amber em { color: #fcd34d; font-style: normal; }
+        .hero-green em { color: #6ee7b7; font-style: normal; } .hero-red em { color: #fca5a5; font-style: normal; }
+
+        .card-body { flex: 1; background: #16161f; padding: 16px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; border-top: 1px solid rgba(255,255,255,0.08); }
+        .card-summary { font-size: 15px; color: var(--text-secondary); line-height: 1.65; }
+        .card-summary strong { color: var(--text-primary); font-weight: 600; }
+        .analogy-box { background: var(--bg-tertiary); border-left: 3px solid var(--accent2); border-radius: 8px; padding: 12px 14px; }
+        .analogy-title { font-size: 10px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent2); margin-bottom: 6px; }
+        .analogy-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+
+        .chat { display: flex; flex-direction: column; gap: 8px; }
+        .bubble { max-width: 85%; padding: 9px 12px; border-radius: 14px; font-size: 14px; line-height: 1.45; }
+        .bubble small { display: block; font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 3px; }
+        .bubble.me { align-self: flex-end; background: #14532d; border-bottom-right-radius: 4px; }
+        .bubble.her { align-self: flex-start; background: var(--bg-tertiary); border-bottom-left-radius: 4px; }
+
+        .roadmap { list-style: none; display: flex; flex-direction: column; gap: 8px; }
+        .roadmap li { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--text-secondary); line-height: 1.5; }
+        .roadmap .step { flex-shrink: 0; width: 22px; height: 22px; border-radius: 50%; background: rgba(6,182,212,0.15); border: 1px solid rgba(6,182,212,0.4); color: #67e8f9; font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; margin-top: 1px; }
+        .roadmap strong { color: var(--text-primary); font-weight: 600; }
+
+        .cta-link { display: block; text-align: center; padding: 13px 16px; background: var(--accent); border-radius: 12px; color: #fff; font-size: 14px; font-weight: 700; text-decoration: none; }
+
+        .i-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+        .i-button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; background: rgba(245,158,11,0.12); border: 1px solid rgba(245,158,11,0.3); border-radius: 20px; font-size: 12px; font-weight: 600; color: var(--i-button); cursor: pointer; }
+        .i-dot { width: 16px; height: 16px; background: var(--i-button); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #000; flex-shrink: 0; }
+
+        .deeper { margin-top: auto; align-self: center; padding: 9px 18px; background: none; border: 1px solid rgba(255,255,255,0.15); border-radius: 99px; color: var(--text-primary); font-size: 12px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; }
+
+        .nav-area { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px 14px; background: var(--bg-secondary); border-top: 1px solid rgba(255,255,255,0.06); }
+        .nav-btn { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.15); background: rgba(255,255,255,0.05); color: var(--text-primary); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .nav-btn:disabled { opacity: 0.2; cursor: default; }
+        .card-counter { font-size: 12px; color: var(--text-secondary); font-weight: 500; }
+
+        .itabs-footer { text-align: center; font-size: 10px; color: rgba(255,255,255,0.4); padding: 0 12px 10px; background: var(--bg-secondary); letter-spacing: 0.04em; line-height: 1.6; }
+        .itabs-footer a { color: inherit; text-decoration: none; }
+
+        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 200; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .modal-overlay.active { opacity: 1; pointer-events: all; }
+        .modal-sheet { width: 100%; max-width: 430px; margin: 0 auto; background: var(--bg-tertiary); border-radius: 20px 20px 0 0; padding: 20px; transform: translateY(100%); transition: transform 0.3s ease; }
+        .modal-overlay.active .modal-sheet { transform: translateY(0); }
+        .modal-handle { width: 36px; height: 4px; background: rgba(255,255,255,0.2); border-radius: 2px; margin: 0 auto 16px; }
+        .modal-term { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+        .modal-type { font-size: 10px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--i-button); margin-bottom: 12px; }
+        .modal-content { font-size: 14px; color: var(--text-secondary); line-height: 1.7; }
+        .modal-close { margin-top: 20px; width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: none; border-radius: 10px; color: var(--text-primary); font-size: 14px; font-weight: 600; cursor: pointer; }
+
+        .contact-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 300; display: flex; align-items: flex-end; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; }
+        .contact-overlay.active { opacity: 1; pointer-events: all; }
+        .contact-sheet { width: 100%; max-width: 430px; margin: 0 auto; background: var(--bg-tertiary); border-radius: 20px 20px 0 0; padding: 20px; transform: translateY(100%); transition: transform 0.3s ease; }
+        .contact-overlay.active .contact-sheet { transform: translateY(0); }
+        .contact-biz-name { font-size: 16px; font-weight: 700; margin-bottom: 16px; text-align: center; }
+        .contact-actions { display: flex; flex-direction: column; gap: 8px; }
+        .contact-action { display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: rgba(255,255,255,0.06); border: none; border-radius: 12px; color: var(--text-primary); text-decoration: none; cursor: pointer; width: 100%; text-align: left; font: inherit; }
+        .ca-icon { font-size: 20px; width: 28px; text-align: center; }
+        .ca-label { font-size: 14px; font-weight: 600; flex: 1; }
+        .ca-detail { font-size: 12px; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+<div class="container">
+    <div class="biz-header">
+        <div class="biz-info">
+            <div class="biz-name">Keluarga Chat</div>
+            <div class="biz-location">Family Chat · English ⇄ Bahasa Indonesia</div>
+        </div>
+        <button class="contact-pill" id="contactBtn">💬 Contact</button>
+    </div>
+    <div class="progress-container" id="progress"></div>
+    <div class="cards-wrapper" id="cardsWrapper"></div>
+    <div class="nav-area">
+        <button class="nav-btn" id="prevBtn" aria-label="Previous layer">←</button>
+        <span class="card-counter" id="counter">Layer 1 / 4</span>
+        <button class="nav-btn" id="nextBtn" aria-label="Next layer">→</button>
+    </div>
+    <div class="itabs-footer">Built by iTabs · Jon · <a href="tel:0421508009">0421 508 009</a> · <a href="mailto:jgwynne7@gmail.com">jgwynne7@gmail.com</a></div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+    <div class="modal-sheet">
+        <div class="modal-handle"></div>
+        <div class="modal-term" id="modalTerm"></div>
+        <div class="modal-type" id="modalType"></div>
+        <div class="modal-content" id="modalContent"></div>
+        <button class="modal-close" id="modalClose">Close</button>
+    </div>
+</div>
+
+<div class="contact-overlay" id="contactOverlay">
+    <div class="contact-sheet">
+        <div class="modal-handle"></div>
+        <div class="contact-biz-name">Jon · iTabs</div>
+        <div class="contact-actions">
+            <a href="tel:0421508009" class="contact-action">
+                <span class="ca-icon">📞</span>
+                <span class="ca-label">Call</span>
+                <span class="ca-detail">0421 508 009</span>
+            </a>
+            <a href="https://wa.me/61421508009" class="contact-action">
+                <span class="ca-icon">💬</span>
+                <span class="ca-label">WhatsApp</span>
+                <span class="ca-detail">Message Jon</span>
+            </a>
+            <a href="mailto:jgwynne7@gmail.com" class="contact-action">
+                <span class="ca-icon">✉️</span>
+                <span class="ca-label">Email</span>
+                <span class="ca-detail">jgwynne7@gmail.com</span>
+            </a>
+            <button class="contact-action" id="saveContactBtn">
+                <span class="ca-icon">💾</span>
+                <span class="ca-label">Save Contact</span>
+                <span class="ca-detail">Add to phone</span>
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+var bizName = 'Jon - iTabs';
+var bizPhone = '+61421508009';
+var bizEmail = 'jgwynne7@gmail.com';
+var bizWebsite = 'https://keluarga-chat-worker.jgwynne7.workers.dev';
+var liveUrl = 'https://keluarga-chat-worker.jgwynne7.workers.dev';
+
+var cards = [
+    {
+        tag: 'Layer 1 / What it is',
+        tagClass: 'tag-purple',
+        headline: 'Chat with family overseas, <em>in their language</em>',
+        heroClass: 'hero-purple',
+        summary: 'Keluarga Chat means <strong>Family Chat</strong>. You type in English, it comes out as natural, polite Bahasa Indonesia, and one tap sends it in <strong>WhatsApp</strong>. Paste their reply in and you get it back in English.',
+        extra: '<div class="analogy-box"><div class="analogy-title">The best bit</div><div class="analogy-text">Your family don\'t install anything. They just keep using WhatsApp like they always do.</div></div>',
+        iButtons: [
+            { label: 'How it works', type: 'context', term: 'How it works', content: 'Pick who you\'re writing to, type your message in English and tap Translate. You see the Indonesian plus an English check-back line, so you know exactly what you\'re sending. Then one tap opens WhatsApp with the message ready to go.' },
+            { label: 'Polite for elders', type: 'why-it-matters', term: 'Polite for elders', content: 'In Indonesian, how you speak to Eyang, Nenek or Opa matters. Keluarga Chat addresses elders by their title instead of a casual "kamu", and keeps it warm and casual for siblings and cousins.' }
+        ]
+    },
+    {
+        tag: 'Layer 2 / Why',
+        tagClass: 'tag-amber',
+        headline: 'Part of the conversation, <em>not the background</em>',
+        heroClass: 'hero-amber',
+        summary: 'I\'m an Aussie boilermaker, married into an Indonesian family who don\'t speak English. I wanted to be part of the conversation, not just in the background.',
+        iButtons: [
+            { label: 'Why not just Google Translate?', type: 'context', term: 'Why not just Google Translate?', content: 'Word-for-word translation can sound stiff, or even rude to an elder. Keluarga Chat writes the way family actually text each other, with the right respect for who you\'re talking to, and shows you what it says in English before you send.' }
+        ]
+    },
+    {
+        tag: 'Layer 3 / Proof',
+        tagClass: 'tag-green',
+        headline: 'The first message <em>landed</em>',
+        heroClass: 'hero-green',
+        summary: 'My first message to my wife went out in natural Indonesian. Her reply:',
+        extra: '<div class="chat"><div class="bubble her">Aku cinta kamu ❤️<small>I love you</small></div></div><a class="cta-link" href="' + liveUrl + '" target="_blank" rel="noopener">Try the live page →</a>',
+        iButtons: [
+            { label: 'What is live today', type: 'context', term: 'What is live today', content: 'A phone-friendly translator page: family contacts saved on your own phone, Formal / Polite / Casual tone, an English check-back line, and one-tap send to WhatsApp. It runs on Cloudflare and uses Claude for the translating, and a family passcode keeps it private.' }
+        ]
+    },
+    {
+        tag: 'Layer 4 / Where it\'s going',
+        tagClass: 'tag-cyan',
+        headline: 'Next: <em>a real two-way chat</em>',
+        heroClass: 'hero-cyan',
+        summary: '',
+        extra: '<ol class="roadmap">' +
+            '<li><span class="step">1</span><span><strong>Inbox:</strong> family replies arrive already translated.</span></li>' +
+            '<li><span class="step">2</span><span><strong>Reply suggestions</strong> so you can answer in a tap.</span></li>' +
+            '<li><span class="step">3</span><span><strong>Tone check</strong> before anything goes to an elder.</span></li>' +
+            '<li><span class="step">4</span><span><strong>Pump helper</strong> for my wife\'s uncle\'s rice farm.</span></li>' +
+            '<li><span class="step">5</span><span><strong>Then Filipino.</strong></span></li>' +
+            '</ol>',
+        iButtons: [
+            { label: 'Pump helper?', type: 'context', term: 'Pump helper', content: 'A helper in Indonesian for the water pump on my wife\'s uncle\'s rice farm, built on the same translation engine.' },
+            { label: 'Want it for your family?', type: 'related', term: 'Want it for your family?', content: 'Tap Contact at the top to call, WhatsApp or email Jon.' }
+        ]
+    }
+];
+
+var currentCard = 0;
+var totalCards = cards.length;
+var modalOverlay = document.getElementById('modalOverlay');
+var modalTerm = document.getElementById('modalTerm');
+var modalType = document.getElementById('modalType');
+var modalContent = document.getElementById('modalContent');
+
+document.getElementById('contactBtn').addEventListener('click', function() { openContact(); });
+document.getElementById('prevBtn').addEventListener('click', function() { navigate(-1); });
+document.getElementById('nextBtn').addEventListener('click', function() { navigate(1); });
+document.getElementById('modalClose').addEventListener('click', function() { closeModal(); });
+document.getElementById('saveContactBtn').addEventListener('click', function() { saveContact(); });
+modalOverlay.addEventListener('click', function(e) { if (e.target === modalOverlay) closeModal(); });
+document.getElementById('contactOverlay').addEventListener('click', function(e) { if (e.target === this) closeContact(); });
+
+function init() {
+    var progress = document.getElementById('progress');
+    var wrapper = document.getElementById('cardsWrapper');
+    for (var i = 0; i < cards.length; i++) {
+        var seg = document.createElement('div');
+        seg.className = 'progress-segment' + (i === 0 ? ' active' : '');
+        progress.appendChild(seg);
+        wrapper.appendChild(buildCard(cards[i], i));
+    }
+    updateCard(0);
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'ArrowRight') navigate(1);
+        if (e.key === 'ArrowLeft') navigate(-1);
+        if (e.key === 'Escape') { closeModal(); closeContact(); }
+    });
+    var startX = 0;
+    var cw = document.getElementById('cardsWrapper');
+    cw.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; }, { passive: true });
+    cw.addEventListener('touchend', function(e) {
+        var diff = startX - e.changedTouches[0].clientX;
+        if (Math.abs(diff) > 50) navigate(diff > 0 ? 1 : -1);
+    });
+}
+
+function buildCard(card, index) {
+    var el = document.createElement('div');
+    el.className = 'card' + (index === 0 ? ' active' : '');
+
+    var heroEl = document.createElement('div');
+    heroEl.className = 'card-hero ' + card.heroClass;
+    heroEl.innerHTML = '<div class="card-tag ' + card.tagClass + '">' + card.tag + '</div><h2 class="card-headline">' + card.headline + '</h2>';
+    // Tap the hero to go one layer deeper.
+    heroEl.addEventListener('click', function() { navigate(1); });
+
+    var bodyEl = document.createElement('div');
+    bodyEl.className = 'card-body';
+    var html = '';
+    if (card.summary) html += '<p class="card-summary">' + card.summary + '</p>';
+    if (card.extra) html += card.extra;
+    if (card.iButtons && card.iButtons.length) {
+        html += '<div class="i-buttons">';
+        for (var j = 0; j < card.iButtons.length; j++) {
+            var b = card.iButtons[j];
+            html += '<button class="i-button" data-term="' + encodeURIComponent(b.term) + '" data-type="' + b.type + '" data-content="' + encodeURIComponent(b.content) + '"><span class="i-dot">i</span>' + b.label + '</button>';
+        }
+        html += '</div>';
+    }
+    if (index < cards.length - 1) {
+        html += '<button class="deeper">Tap to go deeper ↓</button>';
+    } else {
+        html += '<button class="deeper" data-restart="1">↺ Back to the start</button>';
+    }
+    bodyEl.innerHTML = html;
+
+    el.appendChild(heroEl);
+    el.appendChild(bodyEl);
+
+    el.querySelectorAll('.i-button').forEach(function(btn) {
+        btn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            openModal(decodeURIComponent(btn.dataset.term), btn.dataset.type, decodeURIComponent(btn.dataset.content));
+        });
+    });
+    var deeper = el.querySelector('.deeper');
+    deeper.addEventListener('click', function() {
+        if (deeper.dataset.restart) updateCard(0); else navigate(1);
+    });
+    return el;
+}
+
+function navigate(direction) {
+    var next = currentCard + direction;
+    if (next >= 0 && next < totalCards) updateCard(next);
+}
+
+function updateCard(index) {
+    document.querySelectorAll('.card').forEach(function(c, i) {
+        c.classList.remove('active', 'prev');
+        if (i === index) c.classList.add('active');
+        else if (i < index) c.classList.add('prev');
+    });
+    document.querySelectorAll('.progress-segment').forEach(function(s, i) {
+        s.classList.remove('active', 'viewed');
+        if (i === index) s.classList.add('active');
+        else if (i < index) s.classList.add('viewed');
+    });
+    currentCard = index;
+    document.getElementById('counter').textContent = 'Layer ' + (index + 1) + ' / ' + totalCards;
+    document.getElementById('prevBtn').disabled = index === 0;
+    document.getElementById('nextBtn').disabled = index === totalCards - 1;
+}
+
+function openModal(term, type, content) {
+    var typeLabels = { 'definition': 'Definition', 'context': 'Context', 'why-it-matters': 'Why It Matters', 'related': 'Related' };
+    modalTerm.textContent = term;
+    modalType.textContent = typeLabels[type] || type;
+    modalContent.textContent = content;
+    modalOverlay.classList.add('active');
+}
+
+function closeModal() { modalOverlay.classList.remove('active'); }
+function openContact() { document.getElementById('contactOverlay').classList.add('active'); }
+function closeContact() { document.getElementById('contactOverlay').classList.remove('active'); }
+
+function saveContact() {
+    var vcard = 'BEGIN:VCARD\nVERSION:3.0\nFN:' + bizName + '\nTEL:' + bizPhone + '\nEMAIL:' + bizEmail + '\nURL:' + bizWebsite + '\nEND:VCARD';
+    var blob = new Blob([vcard], { type: 'text/vcard' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Jon-iTabs.vcf';
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+init();
+</script>
+</body>
+</html>
