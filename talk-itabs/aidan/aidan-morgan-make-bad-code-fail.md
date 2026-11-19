@@ -1,31 +1,58 @@
-# Make bad code fail — Aidan Morgan
+# Quality gates for agents: Make bad code fail
+
+**Aidan Morgan, Bankwest**
 
 *Talk notes, packaged by iTabs · talk.itabs.co/aidan*
 
-> **NOTES NEEDED:** Jon, paste your notes from Aidan's talk into chat and these sections get filled in.
-> Nothing below this line is Aidan's content yet. The headings show where his points go.
+> Notes compiled by Jon Gwynne from photos of the slides, so a few details may be slightly off.
 
 ---
 
 ## The big idea
 
-<!-- One or two sentences: what Aidan means by "make bad code fail", in his words. -->
+**Make the build say no, so you don't have to.**
+
+When an AI agent writes code, don't rely on asking it nicely or reviewing everything by hand. Set up quality gates that automatically fail bad code, and lock them so the agent can't get around them.
 
 ## Key points
 
-<!-- 4–7 points from the talk, one line each, plus a sentence of why it matters. -->
-
-1. …
-2. …
-3. …
+1. **Check what you can measure.** Readable, tested, structured, safe. If you can measure it, don't ask for it.
+2. **Wire it into every loop, and lock it.** Hooks that exit 2, a required CI check, rules the agent can't edit.
+3. **Ratchet, then grow it.** Baseline today, fail only on worse. Every repeated review comment becomes a house rule.
+4. **A green build is not the whole story.** Gates stop bad code, but they don't catch the wrong fix or keep your team understanding the system.
 
 ## Aidan's quality gate checks
 
-<!-- Each gate Aidan described: what it checks, when it runs, and what makes it fail. -->
+**What to check:** anything you can measure.
 
-| Gate | What it checks | When it runs | Fails when… |
-|------|----------------|--------------|-------------|
-| … | … | … | … |
+| Check | The question it answers |
+|-------|-------------------------|
+| Readable | Can a person follow this code? |
+| Tested | Is it covered by tests that pass? |
+| Structured | Does it follow the project's structure and rules? |
+| Safe | Is it free of known security problems? |
+
+**Where the gates run:** every loop, locked down.
+
+- **Agent hooks that exit 2:** the agent is stopped and told to fix the problem before it can finish.
+- **A required CI check:** code can't be merged until it passes.
+- **Rules the agent can't edit:** so it can't "fix" a failure by loosening the rule.
+
+**How the gates tighten:** a ratchet.
+
+- Record today's numbers as the baseline.
+- Fail only on new or worse code.
+- Turn every repeated review comment into a house rule.
+
+## Your tech debt, now on a payment plan
+
+A **big-bang gate** finds 1,284 problems on day one, and by day two someone switches it off.
+
+A **baseline gate** records today's numbers, fails only on new or worse code, and tightens one step a month.
+
+## This sprint
+
+**Add one gate: your most-failed check, in a Stop hook and in CI.**
 
 ---
 
@@ -34,23 +61,37 @@
 Copy everything in the box below and paste it into your own AI (Claude, ChatGPT, Copilot, whatever you use).
 
 ```text
-I watched Aidan Morgan's talk "Make bad code fail". The idea: set up automatic
-quality gates so bad code fails loudly and early, instead of slipping through
-to production.
+I watched Aidan Morgan's talk "Quality gates for agents: Make bad code fail".
+The idea: make the build say no, so you don't have to. Set up automatic quality
+gates so bad code (including code an AI agent writes) fails loudly and early.
 
-His quality gates were:
-[GATES LIST — filled in from the table above]
+His three rules:
+1. Check what you can measure: readable, tested, structured, safe.
+   If you can measure it, don't ask for it.
+2. Wire it into every loop, and lock it: agent hooks that exit 2,
+   a required CI check, rules the agent can't edit.
+3. Ratchet, then grow it: record a baseline today, fail only on new or
+   worse code, tighten one step a month. Every repeated review comment
+   becomes a house rule.
 
-Help me apply this to my own project. Work through it with me step by step:
+His warning: a green build is not the whole story. Gates don't catch the
+wrong fix, and they don't keep the team understanding the system.
+
+Help me apply this to my own project, one gate at a time:
 
 1. First ask me what my project is: language, framework, how I run tests,
-   where the code lives (e.g. GitHub) and how it gets deployed.
-2. For each of Aidan's gates, tell me whether I already have it, and if not,
-   the simplest tool that would add it for my stack.
-3. Pick the ONE gate that would catch the most bad code for the least effort,
-   and give me the exact files or commands to add it.
-4. Make it fail on purpose once, so I can see the gate actually blocks bad code.
-5. Then suggest the next gate to add, and stop. One gate at a time.
+   where the code lives (e.g. GitHub), how it's deployed, and which AI
+   coding agent I use, if any.
+2. For each of the four checks (readable, tested, structured, safe), tell me
+   whether I already have it, and if not, the simplest tool for my stack.
+3. Ask me which check fails most often today. That's the first gate.
+4. Set it up as a baseline gate, not a big-bang one: record today's numbers
+   and fail only on new or worse code.
+5. Wire it in twice: as a Stop hook (exit code 2) in my coding agent, and as
+   a required check in CI. Give me the exact files and commands.
+6. Show me how to stop the agent editing the gate's rules or config.
+7. Have me make it fail on purpose once, so I can see it really blocks bad code.
+8. Then suggest the next gate and stop.
 
 Keep explanations short and plain. Ask before assuming anything about my setup.
 ```
