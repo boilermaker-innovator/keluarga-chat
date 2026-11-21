@@ -162,7 +162,7 @@ On **keluarga-chat-worker** (Workers & Pages → keluarga-chat-worker → Settin
 
 `DUALHOOK_API_BASE` and `DUALHOOK_PHONE_NUMBER_ID` are plain vars in `wrangler.toml`. The Durable Object is created automatically on deploy.
 
-On **itabs-whatsapp**: its POST handler forwards each webhook body to `https://keluarga-chat-worker.jgwynne7.workers.dev/api/whatsapp/inbound` in `ctx.waitUntil`, with header `x-forward-secret: <KELUARGA_FORWARD_SECRET>`, and always returns 200 to Meta.
+On **itabs-whatsapp** (code in [`itabs-whatsapp/`](itabs-whatsapp/), deployed by its own Workers Build): its POST handler forwards each webhook body to `https://keluarga-chat-worker.jgwynne7.workers.dev/api/whatsapp/inbound` in `ctx.waitUntil`, with header `x-forward-secret: <KELUARGA_FORWARD_SECRET>`, and always returns 200 to Meta.
 
 ### Inbox API
 

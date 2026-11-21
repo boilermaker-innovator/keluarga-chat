@@ -1,0 +1,23 @@
+# itabs-whatsapp: the WhatsApp webhook for +61 421 508 009 (via Dualhook).
+# GET answers Meta's verification; POST logs the body, replies 200 at once,
+# and forwards a copy to keluarga-chat-worker. It never sends WhatsApp messages.
+#
+# Deployed by Cloudflare Workers Builds from this folder (root directory:
+# itabs-whatsapp). Secrets stay in the Cloudflare dashboard, not here:
+#   KELUARGA_FORWARD_SECRET, DUALHOOK_API_KEY
+name = "itabs-whatsapp"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+# Don't wipe variables that were set in the dashboard.
+keep_vars = true
+
+# Private Worker-to-Worker link used for the forward.
+[[services]]
+binding = "KELUARGA"
+service = "keluarga-chat-worker"
+
+# Keep the Observability logs on (the forward results show up there).
+[observability]
+enabled = true
