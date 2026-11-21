@@ -1,0 +1,721 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Keluarga Inbox</title>
+<meta name="description" content="Your family's WhatsApp messages, translated, with replies previewed before sending.">
+<meta name="theme-color" content="#0f766e">
+<meta name="robots" content="noindex">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230f766e'/%3E%3Cpath d='M16 20h32a6 6 0 0 1 6 6v12a6 6 0 0 1-6 6H30l-10 8v-8h-4a6 6 0 0 1-6-6V26a6 6 0 0 1 6-6z' fill='%23fff'/%3E%3C/svg%3E">
+<style>
+  :root {
+    --bg: #f6f5f1; --surface: #ffffff; --surface-2: #efede7; --text: #1d1d1b; --muted: #64625c;
+    --border: #dcd9d0; --accent: #0f766e; --accent-text: #ffffff; --accent-soft: #d8efec;
+    --wa: #1f8f4e; --danger: #b42318; --danger-soft: #fdecea;
+    --warn: #d97706; --warn-soft: #fef6e7; --warn-text: #92400e;
+    --ok-soft: #e6f4ea; --ok-text: #1e6b3a;
+    --bubble-in: #ffffff; --bubble-out: #dcf3e6;
+    --radius: 14px; --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141513; --surface: #1d1f1c; --surface-2: #272a26; --text: #ecebe6; --muted: #a3a29b;
+      --border: #363a35; --accent: #2dd4bf; --accent-text: #0b2522; --accent-soft: #173a36;
+      --wa: #34c26f; --danger: #f97066; --danger-soft: #3a1d1a;
+      --warn: #f59e0b; --warn-soft: #33270f; --warn-text: #fbbf24;
+      --ok-soft: #16301f; --ok-text: #7ee2a0;
+      --bubble-in: #232622; --bubble-out: #163326; --shadow: none;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141513; --surface: #1d1f1c; --surface-2: #272a26; --text: #ecebe6; --muted: #a3a29b;
+    --border: #363a35; --accent: #2dd4bf; --accent-text: #0b2522; --accent-soft: #173a36;
+    --wa: #34c26f; --danger: #f97066; --danger-soft: #3a1d1a;
+    --warn: #f59e0b; --warn-soft: #33270f; --warn-text: #fbbf24;
+    --ok-soft: #16301f; --ok-text: #7ee2a0;
+    --bubble-in: #232622; --bubble-out: #163326; --shadow: none;
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px 16px calc(32px + env(safe-area-inset-bottom)); }
+  header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 4px 0 16px; }
+  h1 { font-size: 1.35rem; margin: 0; letter-spacing: -.01em; }
+  h1 small { display: block; font-size: .85rem; font-weight: 400; color: var(--muted); }
+  h2 { font-size: 1rem; margin: 0 0 10px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); padding: 16px; margin-bottom: 14px; }
+
+  button, select, input, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 44px; padding: 10px 16px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); font-weight: 600; text-decoration: none; color: inherit; }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btn-primary { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+  .btn-wa { background: var(--wa); border-color: var(--wa); color: #fff; }
+  .btn-link { background: none; border: none; color: var(--accent); font-weight: 600; padding: 8px 4px; }
+  .btn-danger { color: var(--danger); }
+  .btn-block { width: 100%; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .row > .grow { flex: 1 1 150px; }
+
+  label { display: block; font-size: .9rem; font-weight: 600; margin-bottom: 6px; }
+  .field { margin-bottom: 12px; }
+  .hint { font-size: .85rem; color: var(--muted); margin: 6px 0 0; }
+  input[type=text], input[type=tel], input[type=password], select, textarea { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); }
+  textarea { min-height: 96px; resize: vertical; }
+  input:focus, select:focus, textarea:focus, button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  .error { background: var(--danger-soft); color: var(--danger); border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-weight: 600; }
+
+  /* chat list */
+  .chats { list-style: none; margin: 0; padding: 0; }
+  .chats li + li { border-top: 1px solid var(--border); }
+  .chat-btn { width: 100%; display: flex; gap: 12px; align-items: center; background: none; border: none; text-align: left; padding: 12px 2px; }
+  .avatar { flex: 0 0 auto; width: 42px; height: 42px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+  .chat-main { flex: 1; min-width: 0; }
+  .chat-top { display: flex; justify-content: space-between; gap: 8px; }
+  .chat-name { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-time { font-size: .8rem; color: var(--muted); flex: 0 0 auto; }
+  .chat-preview { font-size: .9rem; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .chat-meta { display: flex; gap: 6px; align-items: center; margin-top: 2px; }
+  .badge { font-size: .75rem; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
+  .badge-unread { background: var(--accent); color: var(--accent-text); }
+  .badge-open { background: var(--ok-soft); color: var(--ok-text); }
+  .badge-closed { background: var(--surface-2); color: var(--muted); }
+
+  /* thread */
+  .thread-head { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .thread-head h2 { margin: 0; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .window { border-radius: 10px; padding: 10px 12px; font-size: .92rem; margin-bottom: 12px; }
+  .window.open { background: var(--ok-soft); color: var(--ok-text); }
+  .window.closed { background: var(--warn-soft); color: var(--warn-text); border: 1px solid var(--warn); }
+  .messages { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+  .day { align-self: center; font-size: .78rem; color: var(--muted); background: var(--surface-2); border-radius: 999px; padding: 2px 10px; }
+  .bubble { max-width: 88%; border-radius: 14px; padding: 9px 12px; box-shadow: var(--shadow); border: 1px solid var(--border); word-wrap: break-word; white-space: pre-wrap; }
+  .bubble.in { align-self: flex-start; background: var(--bubble-in); border-bottom-left-radius: 4px; }
+  .bubble.out { align-self: flex-end; background: var(--bubble-out); border-bottom-right-radius: 4px; }
+  .bubble .orig { font-size: 1rem; }
+  .bubble .media { font-style: italic; color: var(--muted); }
+  .bubble .en { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); font-size: .92rem; color: var(--muted); }
+  .bubble .en b { font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; margin-right: 4px; }
+  .bubble .meta { font-size: .75rem; color: var(--muted); margin-top: 4px; text-align: right; }
+  .bubble .fail { color: var(--danger); font-weight: 600; font-size: .85rem; margin-top: 4px; white-space: normal; }
+  .bubble .read { color: #2b8be0; }
+  .bubble .retry { padding: 2px 0; min-height: 0; font-size: .85rem; }
+
+  /* preview */
+  .preview { border: 1px solid var(--accent); border-radius: 12px; padding: 12px; margin-top: 12px; }
+  .preview .id-text { font-size: 1.08rem; white-space: pre-wrap; margin: 0 0 8px; }
+  .check { background: var(--surface-2); border-radius: 10px; padding: 8px 12px; margin-bottom: 10px; font-size: .92rem; white-space: pre-wrap; }
+  .check b { display: block; font-size: .75rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .tone { background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+  .tone p { margin: 0 0 8px; font-size: .95rem; }
+  .tone b { display: block; font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: var(--warn-text); }
+  .tone small { display: block; color: var(--muted); }
+
+  details > summary { cursor: pointer; font-weight: 700; list-style: none; display: flex; justify-content: space-between; align-items: center; min-height: 28px; }
+  details > summary::-webkit-details-marker { display: none; }
+  details > summary::after { content: "＋"; color: var(--muted); font-weight: 400; }
+  details[open] > summary::after { content: "－"; }
+  details[open] > summary { margin-bottom: 12px; }
+  .quick-add { list-style: none; padding: 0; margin: 0 0 12px; }
+  .quick-add li { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 0; }
+  .muted { color: var(--muted); }
+  .foot { text-align: center; font-size: .85rem; margin-top: 4px; }
+  .foot a { color: var(--muted); }
+
+  .toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom)); transform: translateX(-50%); background: var(--text); color: var(--bg); padding: 10px 16px; border-radius: 999px; font-weight: 600; font-size: .9rem; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: calc(100% - 32px); }
+  .toast.show { opacity: 1; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Keluarga Inbox <small>Family WhatsApp, translated</small></h1>
+    <button type="button" class="btn-link" id="lock-btn" hidden>Lock</button>
+  </header>
+
+  <!-- Sign in -->
+  <section class="card" id="view-login" hidden>
+    <h2>Enter your PIN</h2>
+    <form id="login-form" autocomplete="off">
+      <div class="field">
+        <label for="pin">Inbox PIN</label>
+        <input type="password" id="pin" inputmode="numeric" autocomplete="current-password" required>
+        <p class="hint">Stays signed in on this device for 30 days.</p>
+      </div>
+      <button type="submit" class="btn btn-primary btn-block" id="login-btn">Open inbox</button>
+    </form>
+    <div class="error" id="login-error" role="alert" hidden></div>
+  </section>
+
+  <!-- Chat list -->
+  <section id="view-list" hidden>
+    <div class="card">
+      <ul class="chats" id="chats"></ul>
+      <p class="muted" id="no-chats" hidden>No relatives yet. Add someone below. Only messages from people on this list are saved and translated.</p>
+    </div>
+
+    <div class="card">
+      <details id="add-details">
+        <summary>Add a relative</summary>
+        <div id="quick-wrap" hidden>
+          <p class="hint" style="margin:0 0 6px">From your translator contacts on this device:</p>
+          <ul class="quick-add" id="quick-add"></ul>
+        </div>
+        <form id="family-form" autocomplete="off">
+          <div class="field"><label for="f-name">Name</label><input type="text" id="f-name" maxlength="60" required placeholder="e.g. Ibu"></div>
+          <div class="field">
+            <label for="f-number">WhatsApp number</label>
+            <input type="tel" id="f-number" inputmode="tel" maxlength="24" required placeholder="+62 812 3456 7890">
+            <p class="hint">With country code. Numbers starting 08 are treated as Indonesian (+62).</p>
+          </div>
+          <div class="field"><label for="f-title">What you call them</label><input type="text" id="f-title" maxlength="40" placeholder="e.g. Eyang, Ibu, Mbak"></div>
+          <div class="field">
+            <label for="f-reg">Politeness</label>
+            <select id="f-reg">
+              <option value="formal">Formal: elders, grandparents, in-laws</option>
+              <option value="polite" selected>Polite: parents, aunts and uncles, older siblings</option>
+              <option value="casual">Casual: your wife, younger siblings, cousins, friends</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-block">Add to inbox</button>
+        </form>
+        <div class="error" id="family-error" role="alert" hidden></div>
+      </details>
+    </div>
+    <p class="foot"><a href="/">Translator</a> · <a href="/about">About Keluarga Chat</a></p>
+  </section>
+
+  <!-- Thread -->
+  <section id="view-thread" hidden>
+    <div class="thread-head">
+      <button type="button" class="btn" id="back-btn" aria-label="Back to all chats">←</button>
+      <h2 id="thread-name"></h2>
+      <button type="button" class="btn-link btn-danger" id="remove-btn">Remove</button>
+    </div>
+    <div class="window" id="window-box"></div>
+    <div class="messages" id="messages"></div>
+
+    <div class="card">
+      <label for="reply">Your reply in English</label>
+      <textarea id="reply" placeholder="Type in English. You'll see the Indonesian before anything is sent."></textarea>
+      <button type="button" class="btn btn-primary btn-block" id="preview-btn" style="margin-top:10px">Preview in Indonesian</button>
+      <div class="error" id="reply-error" role="alert" hidden></div>
+
+      <div class="preview" id="preview" hidden>
+        <div class="tone" id="tone" hidden>
+          <p><b>⚠️ Tone check</b><span id="tone-issue"></span></p>
+          <p><b>Gentler</b><span id="tone-gentler" lang="id"></span><small id="tone-gentler-back"></small></p>
+          <div class="row">
+            <button type="button" class="btn btn-primary grow" id="tone-use">Use gentler version</button>
+            <button type="button" class="btn grow" id="tone-keep">Keep mine</button>
+          </div>
+        </div>
+        <p class="id-text" id="preview-id" lang="id"></p>
+        <div class="check"><b>What it says</b><span id="preview-back"></span></div>
+        <div class="row" id="send-row">
+          <button type="button" class="btn btn-wa grow" id="send-btn">Send</button>
+          <button type="button" class="btn grow" id="edit-btn">Edit</button>
+        </div>
+        <div class="row" id="fallback-row" hidden>
+          <button type="button" class="btn grow" id="copy-btn">Copy Indonesian</button>
+          <a class="btn btn-wa grow" id="open-wa" target="_blank" rel="noopener">Open WhatsApp</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(() => {
+  "use strict";
+
+  const WINDOW_MS = 24 * 60 * 60 * 1000;
+  const SEND_MARGIN_MS = 2 * 60 * 1000;
+  const POLL_MS = 15000;
+
+  const $ = (id) => document.getElementById(id);
+  const state = {
+    view: "login",
+    chats: [],
+    waId: null,
+    thread: null,
+    skew: 0,          // server clock minus this device's clock
+    preview: null,    // { english, indonesian, back, tone, clientId, gentlerUsed, toneDismissed }
+    sending: false,
+  };
+
+  // ---------- helpers ----------
+  let toastTimer;
+  function toast(msg) {
+    const el = $("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.remove("show"), 2200);
+  }
+  function showError(id, msg) { const el = $(id); el.textContent = msg || ""; el.hidden = !msg; }
+  function now() { return Date.now() + state.skew; }
+  function newId() {
+    if (crypto.randomUUID) return crypto.randomUUID().replace(/-/g, "");
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 12);
+  }
+  function el(tag, cls, text) {
+    const e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+  function timeOf(ms) {
+    return new Date(ms).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  }
+  function dayOf(ms) {
+    const d = new Date(ms), t = new Date();
+    const y = new Date(); y.setDate(t.getDate() - 1);
+    if (d.toDateString() === t.toDateString()) return "Today";
+    if (d.toDateString() === y.toDateString()) return "Yesterday";
+    return d.toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+  }
+  function shortWhen(ms) { return dayOf(ms) === "Today" ? timeOf(ms) : dayOf(ms); }
+  function hoursMins(ms) {
+    const m = Math.max(0, Math.floor(ms / 60000));
+    const h = Math.floor(m / 60);
+    return h ? h + "h " + (m % 60) + "m" : (m % 60) + "m";
+  }
+  function windowLeft(lastInbound) {
+    if (!lastInbound) return -1;
+    return lastInbound + WINDOW_MS - SEND_MARGIN_MS - now();
+  }
+  const MEDIA = { image: "📷 Photo", video: "🎬 Video", audio: "🎤 Voice message", document: "📄 Document", sticker: "Sticker", location: "📍 Location", other: "Message type not shown here" };
+
+  async function api(path, opts = {}) {
+    const res = await fetch("/api/inbox/" + path, {
+      method: opts.body ? "POST" : "GET",
+      headers: opts.body ? { "Content-Type": "application/json" } : {},
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+      credentials: "same-origin",
+    });
+    let data = null;
+    try { data = await res.json(); } catch { /* ignore */ }
+    if (res.status === 401 && data && data.code === "signed_out") {
+      showView("login");
+      throw new Error("signed_out");
+    }
+    if (data && typeof data.now === "number") state.skew = data.now - Date.now();
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ("Something went wrong (" + res.status + ")."));
+      err.status = res.status; err.data = data;
+      throw err;
+    }
+    return data;
+  }
+
+  // ---------- views ----------
+  function showView(view) {
+    state.view = view;
+    $("view-login").hidden = view !== "login";
+    $("view-list").hidden = view !== "list";
+    $("view-thread").hidden = view !== "thread";
+    $("lock-btn").hidden = view === "login";
+    if (view === "login") setTimeout(() => $("pin").focus(), 50);
+  }
+
+  // ---------- sign in ----------
+  async function checkSession() {
+    try {
+      const s = await api("session");
+      if (s.signed_in) { await openList(); return; }
+      showView("login");
+      if (!s.configured) showError("login-error", "The inbox PIN isn't set up yet. Add an INBOX_PIN secret (at least 6 characters) to the keluarga-chat-worker in Cloudflare.");
+    } catch (e) {
+      if (e.message !== "signed_out") { showView("login"); showError("login-error", e.message); }
+    }
+  }
+
+  async function login(ev) {
+    ev.preventDefault();
+    showError("login-error", "");
+    $("login-btn").disabled = true;
+    try {
+      await api("login", { body: { pin: $("pin").value } });
+      $("pin").value = "";
+      await openList();
+    } catch (e) {
+      showError("login-error", e.message);
+    } finally {
+      $("login-btn").disabled = false;
+    }
+  }
+
+  async function lock() {
+    try { await api("logout", { body: {} }); } catch { /* ignore */ }
+    state.thread = null; state.waId = null; state.preview = null;
+    showView("login");
+  }
+
+  // ---------- chat list ----------
+  async function openList() {
+    state.waId = null; state.thread = null; state.preview = null;
+    showView("list");
+    await loadChats();
+  }
+
+  async function loadChats() {
+    const data = await api("chats");
+    state.chats = data.chats || [];
+    renderChats();
+    renderQuickAdd();
+  }
+
+  function renderChats() {
+    const ul = $("chats");
+    ul.replaceChildren();
+    $("no-chats").hidden = state.chats.length > 0;
+    if (!state.chats.length) $("add-details").open = true;
+    for (const c of state.chats) {
+      const li = el("li");
+      const b = el("button", "chat-btn");
+      b.type = "button";
+      const av = el("div", "avatar", (c.title || c.name || "?").trim().charAt(0).toUpperCase());
+      const main = el("div", "chat-main");
+      const top = el("div", "chat-top");
+      top.append(el("span", "chat-name", c.name + (c.title && c.title !== c.name ? " (" + c.title + ")" : "")));
+      if (c.last_time) top.append(el("span", "chat-time", shortWhen(c.last_time)));
+      let preview = "No messages yet";
+      if (c.last_id) {
+        if (c.last_dir === "in") preview = c.last_english || c.last_original || MEDIA[c.last_kind] || "Message";
+        else preview = "You: " + (c.last_original || MEDIA[c.last_kind] || "");
+      }
+      const meta = el("div", "chat-meta");
+      const left = windowLeft(c.last_inbound);
+      meta.append(el("span", "badge " + (left > 0 ? "badge-open" : "badge-closed"), left > 0 ? "Reply window " + hoursMins(left) : "Window closed"));
+      if (c.unread > 0) meta.append(el("span", "badge badge-unread", c.unread + " new"));
+      main.append(top, el("div", "chat-preview", preview), meta);
+      b.append(av, main);
+      b.addEventListener("click", () => openThread(c.wa_id));
+      li.append(b);
+      ul.append(li);
+    }
+  }
+
+  // Contacts saved in the translator page on this device (same site).
+  function translatorContacts() {
+    try {
+      const list = JSON.parse(localStorage.getItem("kc.contacts") || "[]");
+      return Array.isArray(list) ? list : [];
+    } catch { return []; }
+  }
+  function toWa(raw) {
+    let d = String(raw || "").replace(/\D/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    else if (d.startsWith("08")) d = "62" + d.slice(1);
+    return d.length >= 8 && d.length <= 15 ? d : "";
+  }
+  function renderQuickAdd() {
+    const have = new Set(state.chats.map((c) => c.wa_id));
+    const list = translatorContacts().filter((c) => c && c.name && toWa(c.phone) && !have.has(toWa(c.phone)));
+    $("quick-wrap").hidden = list.length === 0;
+    const ul = $("quick-add");
+    ul.replaceChildren();
+    for (const c of list) {
+      const li = el("li");
+      li.append(el("span", "", c.name + " · +" + toWa(c.phone)));
+      const b = el("button", "btn-link", "Add");
+      b.type = "button";
+      b.addEventListener("click", () => addFamily({ wa_id: toWa(c.phone), name: c.name, title: c.title || "", reg: c.reg || "polite" }));
+      li.append(b);
+      ul.append(li);
+    }
+  }
+
+  async function addFamily(f) {
+    showError("family-error", "");
+    try {
+      await api("family", { body: f });
+      $("family-form").reset();
+      $("f-reg").value = "polite";
+      toast(f.name + " added. Their next message will show here.");
+      await loadChats();
+    } catch (e) {
+      if (e.message !== "signed_out") showError("family-error", e.message);
+    }
+  }
+
+  // ---------- thread ----------
+  async function openThread(waId) {
+    state.waId = waId;
+    state.thread = null;
+    state.preview = null;
+    $("messages").replaceChildren();
+    $("thread-name").textContent = "";
+    $("window-box").className = "window";
+    $("window-box").textContent = "Loading…";
+    $("reply").value = "";
+    showError("reply-error", "");
+    showView("thread");
+    renderPreview();
+    await loadThread(true);
+  }
+
+  async function loadThread(scroll) {
+    if (!state.waId) return;
+    const waId = state.waId;
+    const data = await api("thread?wa_id=" + encodeURIComponent(waId));
+    if (state.waId !== waId) return;
+    const before = state.thread ? state.thread.messages.length : -1;
+    state.thread = data;
+    renderThread();
+    if (scroll || data.messages.length !== before) {
+      const last = $("messages").lastElementChild;
+      if (last) last.scrollIntoView({ block: "end", behavior: scroll ? "auto" : "smooth" });
+    }
+  }
+
+  function renderThread() {
+    const t = state.thread;
+    if (!t) return;
+    const f = t.family;
+    $("thread-name").textContent = f.name + (f.title && f.title !== f.name ? " (" + f.title + ")" : "");
+    renderWindow();
+
+    const box = $("messages");
+    box.replaceChildren();
+    if (!t.messages.length) box.append(el("p", "muted", "No messages from " + f.name + " yet. When they message your WhatsApp Business number, it will appear here with the English underneath."));
+    let lastDay = "";
+    for (const m of t.messages) {
+      const day = dayOf(m.time);
+      if (day !== lastDay) { box.append(el("div", "day", day)); lastDay = day; }
+      box.append(renderBubble(m));
+    }
+  }
+
+  function renderBubble(m) {
+    const b = el("div", "bubble " + (m.dir === "in" ? "in" : "out"));
+    if (m.kind === "reaction") {
+      b.append(el("div", "orig", "Reacted " + m.original));
+    } else {
+      if (m.kind !== "text" && MEDIA[m.kind]) b.append(el("div", "media", MEDIA[m.kind] + (m.kind === "other" ? "" : ": open WhatsApp to view")));
+      if (m.original) {
+        const o = el("div", "orig", m.original);
+        o.lang = "id";
+        b.append(o);
+      }
+      if (m.dir === "in" && m.original) {
+        const en = el("div", "en");
+        if (m.english) {
+          en.append(el("b", "", "English "), document.createTextNode(m.english));
+        } else if (m.error) {
+          en.append(document.createTextNode("Couldn't translate. "));
+          const r = el("button", "btn-link retry", "Try again");
+          r.type = "button";
+          r.addEventListener("click", () => retranslate(m.id, r));
+          en.append(r);
+        } else {
+          en.textContent = "Translating…";
+        }
+        b.append(en);
+      }
+      if (m.dir === "out" && m.english) {
+        const en = el("div", "en");
+        en.append(el("b", "", "You wrote "), document.createTextNode(m.english));
+        b.append(en);
+      }
+    }
+    const meta = el("div", "meta");
+    let text = timeOf(m.time);
+    if (m.dir === "out") {
+      if (m.source === "phone") text = "Sent from your phone · " + text;
+      const tick = { sending: " · Sending…", accepted: " · ✓", sent: " · ✓", delivered: " · ✓✓", read: " · ✓✓ Read" }[m.status] || "";
+      meta.append(document.createTextNode(text));
+      if (tick) {
+        const s = el("span", m.status === "read" ? "read" : "", tick);
+        meta.append(s);
+      }
+    } else {
+      meta.textContent = text;
+    }
+    b.append(meta);
+    if (m.dir === "out" && m.status === "failed") b.append(el("div", "fail", "Not sent: " + (m.error || "WhatsApp rejected it.")));
+    return b;
+  }
+
+  function windowOpen() {
+    return state.thread && windowLeft(state.thread.last_inbound) > 0;
+  }
+
+  function renderWindow() {
+    const t = state.thread;
+    const box = $("window-box");
+    const left = windowLeft(t.last_inbound);
+    if (left > 0) {
+      box.className = "window open";
+      box.textContent = "Free reply window: " + hoursMins(left) + " left. Replies sent from here are free while it's open.";
+    } else {
+      box.className = "window closed";
+      box.textContent = t.last_inbound
+        ? "⚠️ It's been more than 24 hours since " + t.family.name + "'s last message. WhatsApp only allows replies from here within 24 hours, so Send is off. Copy the Indonesian and send it from the WhatsApp Business app instead."
+        : "⚠️ " + t.family.name + " hasn't messaged your WhatsApp Business number yet. You can reply from here for 24 hours after they do. Until then, copy the Indonesian and send it from the WhatsApp Business app.";
+    }
+    renderSendButtons();
+  }
+
+  async function retranslate(id, btn) {
+    btn.disabled = true;
+    try { await api("retranslate", { body: { id } }); await loadThread(false); }
+    catch (e) { if (e.message !== "signed_out") toast(e.message); btn.disabled = false; }
+  }
+
+  // ---------- reply ----------
+  async function doPreview() {
+    const text = $("reply").value.trim();
+    showError("reply-error", "");
+    if (!text) { showError("reply-error", "Type your reply first."); return; }
+    const btn = $("preview-btn");
+    btn.disabled = true; btn.textContent = "Translating…";
+    try {
+      const r = await api("preview", { body: { wa_id: state.waId, text } });
+      if (state.thread && typeof r.last_inbound !== "undefined") state.thread.last_inbound = r.last_inbound;
+      state.preview = {
+        english: text,
+        indonesian: r.translation,
+        back: r.back_translation,
+        tone: r.tone_check,
+        clientId: newId(),
+        gentlerUsed: false,
+        toneDismissed: false,
+      };
+      renderPreview();
+      renderWindow();
+      $("preview").scrollIntoView({ block: "nearest", behavior: "smooth" });
+    } catch (e) {
+      if (e.message !== "signed_out") showError("reply-error", e.message);
+    } finally {
+      btn.disabled = false; btn.textContent = "Preview in Indonesian";
+    }
+  }
+
+  function renderPreview() {
+    const p = state.preview;
+    $("preview").hidden = !p;
+    if (!p) return;
+    const showTone = p.tone && p.tone.ok === false && p.tone.gentler_translation && !p.gentlerUsed && !p.toneDismissed;
+    $("tone").hidden = !showTone;
+    if (showTone) {
+      $("tone-issue").textContent = p.tone.issue || "This might come across as too blunt.";
+      $("tone-gentler").textContent = p.tone.gentler_translation;
+      $("tone-gentler-back").textContent = p.tone.gentler_back_translation ? "“" + p.tone.gentler_back_translation + "”" : "";
+    }
+    $("preview-id").textContent = p.indonesian;
+    $("preview-back").textContent = p.back || "";
+    renderSendButtons();
+  }
+
+  function renderSendButtons() {
+    const p = state.preview;
+    if (!p || !state.thread) return;
+    const open = windowOpen();
+    $("send-row").hidden = !open;
+    $("fallback-row").hidden = open;
+    $("send-btn").textContent = state.sending ? "Sending…" : "Send to " + state.thread.family.name;
+    $("send-btn").disabled = state.sending;
+    $("open-wa").href = "https://wa.me/" + state.waId + "?text=" + encodeURIComponent(p.indonesian);
+  }
+
+  function useGentler() {
+    const p = state.preview;
+    if (!p || !p.tone) return;
+    p.indonesian = p.tone.gentler_translation;
+    p.back = p.tone.gentler_back_translation;
+    if (p.tone.gentler_english) { p.english = p.tone.gentler_english; $("reply").value = p.english; }
+    p.gentlerUsed = true;
+    p.clientId = newId();
+    renderPreview();
+    toast("Switched to the gentler version");
+  }
+
+  async function doSend() {
+    const p = state.preview;
+    if (!p || state.sending) return;
+    if (!windowOpen()) { renderWindow(); return; }
+    state.sending = true;
+    renderSendButtons();
+    showError("reply-error", "");
+    try {
+      await api("send", { body: { wa_id: state.waId, client_id: p.clientId, indonesian: p.indonesian, english: p.english } });
+      state.preview = null;
+      $("reply").value = "";
+      renderPreview();
+      toast("Sent to " + state.thread.family.name);
+    } catch (e) {
+      if (e.message !== "signed_out") {
+        showError("reply-error", e.message);
+        // A failed attempt is final for this preview; preview again to retry.
+        if (p) p.clientId = newId();
+      }
+    } finally {
+      state.sending = false;
+      renderSendButtons();
+      try { await loadThread(false); } catch { /* ignore */ }
+    }
+  }
+
+  async function copyIndonesian() {
+    const p = state.preview;
+    if (!p) return;
+    try { await navigator.clipboard.writeText(p.indonesian); toast("Copied"); }
+    catch {
+      const ta = el("textarea"); ta.value = p.indonesian; document.body.append(ta); ta.select();
+      try { document.execCommand("copy"); toast("Copied"); } catch { toast("Couldn't copy"); }
+      ta.remove();
+    }
+  }
+
+  async function removeRelative() {
+    const f = state.thread && state.thread.family;
+    if (!f || !confirm("Remove " + f.name + " from the inbox? Their saved messages here are deleted too (WhatsApp itself isn't affected).")) return;
+    try { await api("family/remove", { body: { wa_id: f.wa_id } }); toast(f.name + " removed"); await openList(); }
+    catch (e) { if (e.message !== "signed_out") toast(e.message); }
+  }
+
+  // ---------- polling ----------
+  async function poll() {
+    if (document.visibilityState !== "visible" || state.sending) return;
+    try {
+      if (state.view === "list") await loadChats();
+      else if (state.view === "thread") await loadThread(false);
+    } catch { /* shown on next action */ }
+  }
+
+  // ---------- wire up ----------
+  $("login-form").addEventListener("submit", login);
+  $("lock-btn").addEventListener("click", lock);
+  $("back-btn").addEventListener("click", openList);
+  $("remove-btn").addEventListener("click", removeRelative);
+  $("family-form").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    addFamily({ wa_id: $("f-number").value, name: $("f-name").value, title: $("f-title").value, reg: $("f-reg").value });
+  });
+  $("preview-btn").addEventListener("click", doPreview);
+  $("reply").addEventListener("input", () => {
+    // Changing the English makes the preview stale.
+    if (state.preview && $("reply").value.trim() !== state.preview.english) { state.preview = null; renderPreview(); }
+  });
+  $("tone-use").addEventListener("click", useGentler);
+  $("tone-keep").addEventListener("click", () => { if (state.preview) { state.preview.toneDismissed = true; renderPreview(); } });
+  $("send-btn").addEventListener("click", doSend);
+  $("edit-btn").addEventListener("click", () => { state.preview = null; renderPreview(); $("reply").focus(); });
+  $("copy-btn").addEventListener("click", copyIndonesian);
+  setInterval(poll, POLL_MS);
+  setInterval(() => { if (state.view === "thread" && state.thread) renderWindow(); }, 60000);
+  document.addEventListener("visibilitychange", poll);
+
+  checkSession();
+})();
+</script>
+</body>
+</html>

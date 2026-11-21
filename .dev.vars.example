@@ -1,6 +1,7 @@
 # Copy to .dev.vars (repo root) for `npx wrangler dev`. .dev.vars is git-ignored.
 ANTHROPIC_API_KEY=sk-ant-...
 FAMILY_PASSCODE=choose-a-passcode
-WHATSAPP_VERIFY_TOKEN=choose-a-verify-token
-# WHATSAPP_APP_SECRET=optional-meta-app-secret
+KELUARGA_FORWARD_SECRET=same-long-random-string-as-on-itabs-whatsapp
+DUALHOOK_API_KEY=your-dualhook-api-key
+INBOX_PIN=choose-at-least-6-digits
 ALLOWED_ORIGINS=http://localhost:8787

@@ -1,4 +1,4 @@
-# One Worker serves both the page (site/) and the translate API (/api/*).
+# One Worker serves the pages (site/), the translate API and the WhatsApp inbox.
 # Deploy from the repo root with: npx wrangler deploy
 name = "keluarga-chat-worker"
 main = "worker/src/index.js"
@@ -8,13 +8,16 @@ compatibility_flags = ["nodejs_compat"]
 [assets]
 directory = "./site"
 binding = "ASSETS"
-# /api/* and /webhook go to the Worker code; everything else is served from site/.
-run_worker_first = ["/api/*", "/webhook"]
+# /api/* goes to the Worker code; everything else is served from site/.
+run_worker_first = ["/api/*"]
 
 [vars]
-# Page addresses allowed to call the API, comma-separated, no trailing slash.
+# Page addresses allowed to call /api/translate, comma-separated, no trailing slash.
 # Requests from the Worker's own address are always allowed.
 ALLOWED_ORIGINS = "https://keluarga-chat-worker.jgwynne7.workers.dev,https://keluarga-chat.pages.dev"
+# Replies from the inbox are sent through Dualhook (standard Cloud API body).
+DUALHOOK_API_BASE = "https://api.dualhook.com/v25.0"
+DUALHOOK_PHONE_NUMBER_ID = "1029126906956824"
 
 # Per-IP limit: 20 translations a minute is plenty for one person.
 [[ratelimits]]
@@ -25,9 +28,21 @@ namespace_id = "1001"
   limit = 20
   period = 60
 
-# Received WhatsApp messages (with their English translations).
-# No id on purpose: on the first deploy Wrangler creates the KV namespace
-# automatically and links it here. If you'd rather create it yourself, make
-# a namespace in the dashboard and add its id:  id = "<namespace id>"
-[[kv_namespaces]]
-binding = "INBOX"
+# Per-IP limit on inbox PIN attempts.
+[[ratelimits]]
+name = "PIN_LIMITER"
+namespace_id = "1002"
+
+  [ratelimits.simple]
+  limit = 5
+  period = 60
+
+# The WhatsApp inbox: family list, messages and delivery ticks, in one
+# SQLite-backed Durable Object. Created automatically on deploy.
+[[durable_objects.bindings]]
+name = "INBOX_DO"
+class_name = "InboxStore"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["InboxStore"]

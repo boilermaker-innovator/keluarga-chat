@@ -131,23 +131,60 @@ Response:
 
 Errors come back as `{ "error": "<friendly message>" }` with these status codes: 400 (bad input), 401 (wrong passcode), 403 (origin not allowed), 422 (declined), 429 (rate limited), and 502/503 (upstream problems).
 
-## WhatsApp webhook (receive only)
+## WhatsApp inbox
 
-`/webhook` receives messages from Meta's WhatsApp Cloud API (via Dualhook coexistence). Nothing is sent back to WhatsApp.
+Open **/inbox** (PIN-protected): one chat per relative, their WhatsApp message with the English underneath, and replies you write in English, preview in Indonesian (with the tone check) and send only when you tap **Send**.
 
-- `GET /webhook`: Meta's verification handshake. Returns `hub.challenge` when `hub.verify_token` matches the `WHATSAPP_VERIFY_TOKEN` secret, otherwise 403.
-- `POST /webhook`: replies 200 immediately, then in the background translates each **text** message Indonesian → English with the same Claude call as the page and saves it to the `INBOX` KV namespace. Status updates and media are ignored.
-- Each saved message (key `msg:<newest-first>:<message id>`) is JSON: `{ id, from, name, original, english, notes, time, error }`. The original is saved first, so if translation fails it's still there with `error` set.
-- Optional `WHATSAPP_APP_SECRET` secret (your Meta app secret): when set, POSTs without a valid `X-Hub-Signature-256` are refused. Recommended, since without it anyone who finds the URL could post fake messages.
-- `INBOX` has no id in `wrangler.toml`; Wrangler creates the namespace on the first deploy. Messages expire after a year.
+```
+Meta → Dualhook → itabs-whatsapp  (GET verification; logs; replies 200 at once)
+                       │ background copy, header x-forward-secret
+                       ▼
+          keluarga-chat-worker  POST /api/whatsapp/inbound
+            • family-only: everyone else is ignored (not stored, not translated)
+            • translates to English, stores in the InboxStore Durable Object (SQLite)
+          /inbox page → /api/inbox/* (PIN cookie) → Send → Dualhook API → WhatsApp
+```
+
+- **Nothing is sent automatically.** The only code path that calls Dualhook is `POST /api/inbox/send`, which the page calls when you tap Send. A double tap can't send twice (each preview has its own id).
+- **24-hour rule.** Send works only within 24 hours (minus 2 minutes) of the relative's last message; otherwise the API refuses and the page offers **Copy Indonesian** + **Open WhatsApp** so you can send from the Business app.
+- **Stored per message:** original, English, notes, delivery status (✓ sent, ✓✓ delivered, ✓✓ read, or the failure reason). Messages you send from the Business app appear as "Sent from your phone" when Dualhook passes on `smb_message_echoes`. Photos, voice notes and videos show a placeholder (captions are translated).
+- **Removing a relative** deletes their saved messages from the inbox (WhatsApp itself isn't affected).
+
+### Inbox setup
+
+On **keluarga-chat-worker** (Workers & Pages → keluarga-chat-worker → Settings → Variables and Secrets, type **Secret**):
+
+| Secret | Value |
+|---|---|
+| `KELUARGA_FORWARD_SECRET` | the same value as on itabs-whatsapp |
+| `DUALHOOK_API_KEY` | the same key as on itabs-whatsapp |
+| `INBOX_PIN` | your PIN, at least 6 characters |
+
+`DUALHOOK_API_BASE` and `DUALHOOK_PHONE_NUMBER_ID` are plain vars in `wrangler.toml`. The Durable Object is created automatically on deploy.
+
+On **itabs-whatsapp**: its POST handler forwards each webhook body to `https://keluarga-chat-worker.jgwynne7.workers.dev/api/whatsapp/inbound` in `ctx.waitUntil`, with header `x-forward-secret: <KELUARGA_FORWARD_SECRET>`, and always returns 200 to Meta.
+
+### Inbox API
+
+All under `/api/inbox/`, same-origin only; everything except `session` and `login` needs the PIN cookie.
+
+| Endpoint | Does |
+|---|---|
+| `GET session` | `{ signed_in, configured }` |
+| `POST login` `{ pin }` / `POST logout` | sets / clears a 30-day HttpOnly cookie (5 PIN tries a minute per IP) |
+| `GET chats` | family list with last message, unread count and `last_inbound` |
+| `GET thread?wa_id=` | one relative's messages (marks them read) |
+| `POST family` `{ wa_id, name, title, reg }` / `POST family/remove` `{ wa_id }` | manage the family list |
+| `POST preview` `{ wa_id, text }` | English → Indonesian with tone check (no sending) |
+| `POST send` `{ wa_id, client_id, indonesian, english }` | sends through Dualhook; 409 `window_closed` past 24 hours |
+| `POST retranslate` `{ id }` | retries a failed translation |
 
 ## Roadmap
 
 - [x] Translator page with contacts, registers, check-back line and WhatsApp send
 - [x] Worker with secret key, passcode, CORS allowlist, rate limit and size cap
 - [x] Reply suggestions and tone check
-- [x] WhatsApp webhook: receive, translate and store incoming messages
-- [ ] Inbox page showing received WhatsApp messages
+- [x] WhatsApp inbox: family messages translated, replies previewed and sent on tap, 24-hour rule, PIN
 - [ ] Saved phrases (e.g. *Selamat Idul Fitri, mohon maaf lahir dan batin*) and greetings for Lebaran, birthdays and Natal
 - [ ] Recent translations history (on-device)
 - [ ] Voice input on mobile
