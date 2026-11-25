@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QR Pay: Indonesia vs Australia</title>
+<meta name="description" content="A demo comparing QRIS payments in Indonesia with how a PayID QR could work in Australia, with a decoder that shows what's inside the code.">
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --card: #ffffff;
+    --ink: #1d2128;
+    --muted: #5d6470;
+    --line: #e3e0d8;
+    --soft: #f1eee7;
+    --id: #c8102e;
+    --id-soft: #fdecee;
+    --au: #00843d;
+    --au-soft: #e7f5ec;
+    --gold: #b07d00;
+    --gold-soft: #fff6dc;
+    --ok: #1a7f37;
+    --bad: #c62828;
+    --code-bg: #1d2128;
+    --code-ink: #f3f1ea;
+    --radius: 16px;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 6px 20px rgba(0,0,0,.05);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #121418; --card: #1b1e24; --ink: #eceae4; --muted: #a2a8b3; --line: #2c3038; --soft: #23272e;
+      --id: #ff5a6e; --id-soft: #3a1c22; --au: #3fcf7f; --au-soft: #15301f; --gold: #f2c14e; --gold-soft: #3a3016;
+      --ok: #4ad07a; --bad: #ff6b6b; --code-bg: #0c0e11; --code-ink: #eceae4;
+      --shadow: 0 1px 2px rgba(0,0,0,.3);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #121418; --card: #1b1e24; --ink: #eceae4; --muted: #a2a8b3; --line: #2c3038; --soft: #23272e;
+    --id: #ff5a6e; --id-soft: #3a1c22; --au: #3fcf7f; --au-soft: #15301f; --gold: #f2c14e; --gold-soft: #3a3016;
+    --ok: #4ad07a; --bad: #ff6b6b; --code-bg: #0c0e11; --code-ink: #eceae4;
+    --shadow: 0 1px 2px rgba(0,0,0,.3);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 20px 16px 48px; }
+  h1 { font-size: clamp(1.7rem, 6vw, 2.5rem); line-height: 1.15; margin: 8px 0 6px; letter-spacing: -0.02em; }
+  h2 { font-size: 1.35rem; margin: 0 0 8px; letter-spacing: -0.01em; }
+  h3 { font-size: 1.05rem; margin: 18px 0 8px; }
+  p { margin: 0 0 10px; }
+  .muted { color: var(--muted); }
+  .small { font-size: .88rem; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+
+  .pill {
+    display: inline-block; font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 999px; background: var(--gold-soft); color: var(--gold);
+  }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); padding: 18px; }
+  section { margin-top: 22px; }
+
+  /* Stall */
+  .stall { display: flex; gap: 14px; align-items: center; }
+  .stall .icon { font-size: 2.4rem; line-height: 1; flex: none; }
+  .stall .name { font-weight: 700; font-size: 1.1rem; }
+  .price { margin-left: auto; text-align: right; flex: none; }
+  .price b { font-size: 1.5rem; display: block; line-height: 1.1; }
+
+  /* Panels */
+  .panels { display: grid; gap: 16px; grid-template-columns: 1fr; }
+  @media (min-width: 780px) { .panels { grid-template-columns: 1fr 1fr; } }
+  .panel { border-top: 6px solid var(--accent); display: flex; flex-direction: column; }
+  .panel.id { --accent: var(--id); --accent-soft: var(--id-soft); }
+  .panel.au { --accent: var(--au); --accent-soft: var(--au-soft); }
+  .panel-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+  .panel-head h2 { margin: 0; }
+  .status { font-size: .8rem; font-weight: 700; color: var(--accent); background: var(--accent-soft); padding: 3px 9px; border-radius: 999px; }
+
+  .qr-wrap {
+    margin: 16px auto 6px; width: min(260px, 100%); position: relative;
+    background: #fff; border-radius: 14px; padding: 14px; border: 2px dashed var(--accent);
+  }
+  .qr-wrap svg { display: block; width: 100%; height: auto; }
+  .qr-banner {
+    position: absolute; top: -12px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+    background: var(--bad); color: #fff; font-size: .72rem; font-weight: 800; letter-spacing: .06em;
+    padding: 3px 10px; border-radius: 6px;
+  }
+  .qr-caption { text-align: center; font-size: .85rem; color: var(--muted); margin-bottom: 6px; }
+
+  ol.steps { padding-left: 0; list-style: none; counter-reset: s; margin: 8px 0 4px; }
+  ol.steps li { counter-increment: s; position: relative; padding: 0 0 10px 36px; }
+  ol.steps li::before {
+    content: counter(s); position: absolute; left: 0; top: 0; width: 24px; height: 24px; border-radius: 50%;
+    background: var(--accent-soft); color: var(--accent); font-weight: 800; font-size: .82rem;
+    display: grid; place-items: center;
+  }
+  .facts { display: grid; gap: 10px; margin: 6px 0 14px; }
+  .fact { background: var(--soft); border-radius: 12px; padding: 10px 12px; }
+  .fact .label { font-size: .78rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--accent); }
+  .panel .spacer { flex: 1; }
+
+  button, .btn {
+    font: inherit; font-weight: 700; cursor: pointer; border-radius: 12px; border: 0;
+    padding: 12px 16px; min-height: 44px; background: var(--ink); color: var(--bg);
+  }
+  button.ghost { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  button.accent { background: var(--accent); color: #fff; }
+  button:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+
+  /* How it's built */
+  .tlv-demo { display: flex; flex-wrap: wrap; gap: 6px; align-items: stretch; margin: 10px 0 14px; }
+  .tlv-demo span { padding: 8px 10px; border-radius: 10px; font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; text-align: center; }
+  .tlv-demo small { display: block; font-family: system-ui, sans-serif; font-weight: 600; font-size: .7rem; opacity: .8; }
+  .t-id { background: #e3ecff; color: #1d3f8f; }
+  .t-len { background: #fff0d1; color: #7a5200; }
+  .t-val { background: #dcf5e4; color: #12592c; }
+  .keys { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  @media (min-width: 620px) { .keys { grid-template-columns: 1fr 1fr; } }
+  .key { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--soft); }
+  .key .tag { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; color: var(--gold); }
+
+  /* Decoder */
+  .seg { display: flex; gap: 6px; margin: 14px 0 10px; flex-wrap: wrap; }
+  .seg button { flex: 1 1 140px; }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+  .seg button[aria-pressed="false"] { background: transparent; color: var(--ink); border: 1.5px solid var(--line); }
+  .raw {
+    background: var(--code-bg); color: var(--code-ink); border-radius: 12px; padding: 12px;
+    font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .85rem; line-height: 1.7;
+    word-break: break-all; margin: 10px 0;
+  }
+  .raw span { border-radius: 4px; padding: 1px 0; }
+  .raw .hl { background: rgba(242,193,78,.35); outline: 1px solid rgba(242,193,78,.8); }
+  .raw .alt { color: #9ecbff; }
+  .decoded { display: none; }
+  .decoded.open { display: block; }
+  .field { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; background: var(--card); }
+  .field.key-field { border-color: var(--gold); background: var(--gold-soft); }
+  .field-top { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+  .field-tag { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 800; font-size: .82rem; background: var(--soft); border-radius: 6px; padding: 1px 6px; }
+  .field-name { font-weight: 700; }
+  .field-badge { font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--gold); }
+  .field-val { font-family: ui-monospace, Menlo, Consolas, monospace; word-break: break-all; margin: 4px 0 2px; }
+  .field-why { color: var(--muted); font-size: .88rem; }
+  .sub { margin: 8px 0 0 10px; padding-left: 10px; border-left: 2px solid var(--line); }
+  .sub .field { background: var(--soft); }
+  .check { border-radius: 12px; padding: 12px; font-weight: 700; margin: 10px 0; }
+  .check.ok { background: color-mix(in srgb, var(--ok) 14%, transparent); color: var(--ok); }
+  .check.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+  .row-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+
+  /* Comparison */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+  @media (max-width: 480px) { th, td { padding: 8px 4px; } }
+  th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+
+  /* Summary */
+  textarea {
+    width: 100%; min-height: 230px; font: .88rem/1.5 ui-monospace, Menlo, Consolas, monospace;
+    background: var(--soft); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 12px; resize: vertical;
+  }
+  footer { margin-top: 28px; font-size: .82rem; color: var(--muted); text-align: center; }
+</style>
+</head>
+<body>
+<main>
+
+  <header>
+    <span class="pill">Demo · no real payments</span>
+    <h1>QR Pay: Indonesia vs Australia</h1>
+    <p class="muted">The same plate of nasi goreng, paid for two ways. Indonesia already has one QR code that every banking and e-wallet app can scan. Australia doesn't yet. Here's what each one looks like for a small food stall.</p>
+  </header>
+
+  <section class="card stall" aria-label="The demo food stall">
+    <div class="icon" aria-hidden="true">🍳</div>
+    <div>
+      <div class="name">Warung Demo</div>
+      <div class="muted small">Nasi Goreng · made-up stall for this demo</div>
+    </div>
+    <div class="price">
+      <b>$8</b>
+      <span class="muted small">≈ Rp 85.000</span>
+    </div>
+  </section>
+
+  <section class="panels">
+    <!-- Indonesia -->
+    <article class="card panel id" aria-labelledby="id-title">
+      <div class="panel-head">
+        <h2 id="id-title">🇮🇩 Indonesia · QRIS</h2>
+        <span class="status">Live today</span>
+      </div>
+      <div class="qr-wrap" id="qr-id" role="img" aria-label="Sample QRIS-style QR code marked DEMO. Not a real merchant code.">
+        <div class="qr-banner">DEMO · NOT A REAL MERCHANT</div>
+      </div>
+      <div class="qr-caption">Sample code for Rp 85.000. Scanning it won't pay anyone.</div>
+
+      <h3>When a customer scans</h3>
+      <ol class="steps">
+        <li>They open <b>whatever app they already use</b>: a bank app (BCA mobile, Livin' by Mandiri, BRImo) or an e-wallet (GoPay, OVO, DANA, ShopeePay).</li>
+        <li>The app reads the code and shows <b>"WARUNG DEMO · Rp 85.000"</b>. If the code has no price in it, they type the amount.</li>
+        <li>They confirm with a PIN or fingerprint. The stall hears a "pembayaran berhasil" (payment received) chime or sees it on their phone.</li>
+      </ol>
+      <div class="facts">
+        <div class="fact"><div class="label">Which app</div>Any one. Every QRIS code works with every QRIS app, so the stall needs only one code, not a sticker for each wallet.</div>
+        <div class="fact"><div class="label">Where the money goes</div>Through the national QRIS switch to the stall's own bank or e-wallet account, usually the same day or the next business day.</div>
+        <div class="fact"><div class="label">What it costs the stall</div><b>Rp 0 here.</b> For micro businesses, Bank Indonesia sets a 0% fee on sales up to Rp 100.000 and 0.3% above that. Bigger businesses pay around 0.7%. The customer pays nothing.</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="accent" data-peek="id">Peek inside this code ↓</button>
+    </article>
+
+    <!-- Australia -->
+    <article class="card panel au" aria-labelledby="au-title">
+      <div class="panel-head">
+        <h2 id="au-title">🇦🇺 Australia · PayID QR</h2>
+        <span class="status">How it could work</span>
+      </div>
+      <div class="qr-wrap" id="qr-au" role="img" aria-label="Concept PayID QR code marked DEMO. Not a real merchant code.">
+        <div class="qr-banner">DEMO · NOT A REAL MERCHANT</div>
+      </div>
+      <div class="qr-caption">Concept code for A$8.00. No bank app will accept it.</div>
+
+      <h3>When a customer scans</h3>
+      <ol class="steps">
+        <li>They open <b>their own bank app</b> (CommBank, NAB, Westpac, ANZ, ING, Up…) and choose pay or scan. Today, many bank apps can't scan a payment QR yet, so they'd type the PayID instead.</li>
+        <li>The app looks up the PayID and shows the registered name, <b>"WARUNG DEMO"</b>, so they can check they're paying the right business. The A$8.00 and reference fill in from the code.</li>
+        <li>They confirm. Through the New Payments Platform (Osko), the money usually arrives in under a minute, any time, any day.</li>
+      </ol>
+      <div class="facts">
+        <div class="fact"><div class="label">Which app</div>The customer's normal banking app. No extra wallet to download, but there's no single scan standard that every Australian bank app supports yet.</div>
+        <div class="fact"><div class="label">Where the money goes</div>Straight into the stall's bank account linked to their PayID (an email, mobile number or ABN). No card scheme sits in the middle.</div>
+        <div class="fact"><div class="label">What it costs the stall</div><b>Usually $0.</b> Most banks don't charge to receive a PayID payment, though some business accounts have a small per-transaction fee. A card tap for the same $8 typically costs the stall 1–2%, plus terminal rental.</div>
+      </div>
+      <div class="spacer"></div>
+      <button class="accent" data-peek="au">Peek inside this code ↓</button>
+    </article>
+  </section>
+
+  <!-- How it's built -->
+  <section class="card" id="inside" aria-labelledby="inside-title">
+    <h2 id="inside-title">How a QRIS code is built</h2>
+    <p>A QRIS code is just a line of text in a QR square. It follows <b>EMV QR</b>, the international merchant QR standard written by EMVCo (the group behind chip cards). The text is a chain of small blocks, and every block has the same three parts:</p>
+    <div class="tlv-demo" aria-label="Example block 5802ID">
+      <span class="t-id">58<small>ID: what it is</small></span>
+      <span class="t-len">02<small>Length: 2 characters</small></span>
+      <span class="t-val">ID<small>Value: Indonesia</small></span>
+    </div>
+    <p>Tag 58 is always the country, so <code>5802ID</code> means "country: ID". Some blocks hold smaller blocks inside them, built the same way. These four matter most:</p>
+    <div class="keys">
+      <div class="key"><span class="tag">26 / 51</span> <b>Merchant ID</b><br><span class="small muted">Who gets paid. Tag 51 holds the stall's national merchant ID (NMID); tag 26 says which bank or e-wallet signed the stall up.</span></div>
+      <div class="key"><span class="tag">54</span> <b>Amount</b><br><span class="small muted">Optional. If it's there, the app fills in the price. If not, the customer types it. One sticker on the cart has no amount; a code shown on a till for one order does.</span></div>
+      <div class="key"><span class="tag">58</span> <b>Country code</b><br><span class="small muted">"ID" for Indonesia. Tag 53 next to it gives the currency: 360 means rupiah.</span></div>
+      <div class="key"><span class="tag">63</span> <b>Checksum</b><br><span class="small muted">Always the last block: a 4-character CRC worked out from everything before it. Change one character and it no longer matches, so the app refuses the code.</span></div>
+    </div>
+
+    <div class="seg" role="group" aria-label="Choose a sample to decode">
+      <button type="button" id="pick-id" aria-pressed="true">🇮🇩 QRIS sample</button>
+      <button type="button" id="pick-au" aria-pressed="false">🇦🇺 PayID concept</button>
+    </div>
+    <div class="raw" id="raw" aria-label="The raw text inside the code"></div>
+    <div class="row-btns">
+      <button type="button" id="peek">🔍 Peek inside the code</button>
+      <button type="button" class="ghost" id="tamper" hidden>Change the price without fixing the checksum</button>
+    </div>
+    <div class="decoded" id="decoded" aria-live="polite"></div>
+  </section>
+
+  <!-- Comparison -->
+  <section class="card" aria-labelledby="cmp-title">
+    <h2 id="cmp-title">Side by side</h2>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th></th><th>🇮🇩 QRIS</th><th>🇦🇺 PayID QR (concept)</th></tr></thead>
+        <tbody>
+          <tr><td><b>Status</b></td><td>National standard since 2020, run by Bank Indonesia</td><td>PayID is live; no single national merchant QR yet</td></tr>
+          <tr><td><b>Customer's app</b></td><td>Any bank or e-wallet app</td><td>Their own bank app</td></tr>
+          <tr><td><b>Money lands</b></td><td>Stall's account, same or next day</td><td>Stall's account, in seconds</td></tr>
+          <tr><td><b>Cost on an $8 sale</b></td><td>0% (micro stall, under Rp 100.000)</td><td>Usually $0 (vs ~1–2% for a card tap)</td></tr>
+          <tr><td><b>What the stall needs</b></td><td>One printed sticker</td><td>A PayID and a printed sticker</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="small muted" style="margin-top:10px">Fees and rules change. Figures are a plain-English guide as of late 2026; check with Bank Indonesia or the stall's bank before relying on them.</p>
+  </section>
+
+  <!-- PM summary -->
+  <section class="card" aria-labelledby="pm-title">
+    <h2 id="pm-title">Summary for my PM Claude</h2>
+    <p class="muted small">Copy this and paste it back into your project-manager chat.</p>
+    <textarea id="pm" readonly>QR Pay: Indonesia vs Australia (weekend demo page)
+- One plain HTML file (site/qr-pay.html), no build step; works on Cloudflare Pages or the existing Worker at /qr-pay.
+- Shows a made-up stall (Warung Demo, Nasi Goreng $8 ≈ Rp 85.000) with two side-by-side panels: QRIS in Indonesia (live today) and a PayID QR in Australia (concept).
+- Fully self-contained: no external scripts or fonts. Both QR codes are built into the page and stamped DEMO / NOT A REAL MERCHANT; merchant IDs are fake and the AU scheme ID is invented.
+- Each panel explains in plain English which app the customer opens, where the money goes, and what it costs the stall (QRIS 0% for micro sales up to Rp 100.000; PayID usually $0 vs 1–2% for cards).
+- "How a QRIS code is built" explains EMV QR (tag, length, value) and the four key parts: merchant ID (26/51), amount (54), country (58), checksum (63 CRC). "Peek inside the code" decodes the sample live, checks the checksum, and has a "tamper" button that shows the checksum failing.
+- Next: decide whether to link it from the iTabs site, and double-check fee figures before showing it to a real stall owner.</textarea>
+    <div class="row-btns" style="margin-top:10px">
+      <button type="button" id="copy">Copy summary</button>
+    </div>
+  </section>
+
+  <footer>
+    Demo only. Warung Demo is made up and these codes can't take real money. QRIS is a Bank Indonesia standard; PayID and Osko are run by Australian Payments Plus. This page isn't affiliated with either.
+  </footer>
+</main>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---------- Build the sample payloads (EMV QR, tag-length-value) ----------
+  function tlv(id, value) {
+    var len = String(value.length);
+    if (len.length < 2) len = "0" + len;
+    return id + len + value;
+  }
+  // CRC-16/CCITT-FALSE: polynomial 0x1021, start 0xFFFF. This is what EMV QR uses.
+  function crc16(str) {
+    var crc = 0xFFFF;
+    for (var i = 0; i < str.length; i++) {
+      crc ^= str.charCodeAt(i) << 8;
+      for (var b = 0; b < 8; b++) {
+        crc = (crc & 0x8000) ? ((crc << 1) ^ 0x1021) : (crc << 1);
+        crc &= 0xFFFF;
+      }
+    }
+    return ("0000" + crc.toString(16).toUpperCase()).slice(-4);
+  }
+  function withCrc(body) {
+    var data = body + "6304";
+    return data + crc16(data);
+  }
+
+  var SAMPLES = {
+    id: withCrc(
+      tlv("00", "01") +
+      tlv("01", "12") +
+      tlv("26",
+        tlv("00", "ID.CO.DEMOBANK.WWW") +
+        tlv("01", "9360999900000DEMO1") +
+        tlv("02", "DEMO000000001") +
+        tlv("03", "UMI")) +
+      tlv("51",
+        tlv("00", "ID.CO.QRIS.WWW") +
+        tlv("02", "ID0000DEMO00001") +
+        tlv("03", "UMI")) +
+      tlv("52", "5812") +
+      tlv("53", "360") +
+      tlv("54", "85000") +
+      tlv("58", "ID") +
+      tlv("59", "WARUNG DEMO - NOT REAL") +
+      tlv("60", "JAKARTA") +
+      tlv("61", "10110") +
+      tlv("62", tlv("01", "DEMO-NASGOR") + tlv("07", "DEMO01"))
+    ),
+    au: withCrc(
+      tlv("00", "01") +
+      tlv("01", "12") +
+      tlv("26",
+        tlv("00", "AU.DEMO.PAYID") +
+        tlv("01", "pay@warungdemo.example") +
+        tlv("02", "EMAIL")) +
+      tlv("52", "5812") +
+      tlv("53", "036") +
+      tlv("54", "8.00") +
+      tlv("58", "AU") +
+      tlv("59", "WARUNG DEMO - NOT REAL") +
+      tlv("60", "SYDNEY") +
+      tlv("62", tlv("05", "NASIGORENG01"))
+    )
+  };
+  var TAMPER = { id: ["85000", "95000"], au: ["8.00", "9.00"] };
+
+  // ---------- Plain-English names for each tag ----------
+  var TOP = {
+    "00": ["Payload format", "Always 01. It tells the app: this is an EMV QR code."],
+    "01": ["Static or dynamic", null],
+    "26": ["Merchant account", null],
+    "51": ["QRIS national merchant ID", "The part every QRIS app trusts: the stall's ID in the national register."],
+    "52": ["Merchant category", null],
+    "53": ["Currency", null],
+    "54": ["Amount", "The price. Because it's in the code, the customer doesn't have to type it."],
+    "58": ["Country code", null],
+    "59": ["Merchant name", "What the customer sees on screen before they confirm."],
+    "60": ["City", "Where the stall is."],
+    "61": ["Postcode", "Optional extra location detail."],
+    "62": ["Extra details", "Optional small blocks such as a bill number or till label."],
+    "63": ["Checksum (CRC)", "Worked out from every character before it. If anything was changed, this won't match."]
+  };
+  var KEY_TAGS = { "26": 1, "51": 1, "54": 1, "58": 1, "63": 1 };
+  var TEMPLATES = { "26": 1, "51": 1, "62": 1 };
+
+  function describe(id, val, which) {
+    var t = TOP[id];
+    var name = t ? t[0] : (Number(id) >= 26 && Number(id) <= 51 ? "Merchant account" : "Tag " + id);
+    var why = t ? t[1] : "";
+    if (id === "01") why = val === "12" ? "12 = dynamic: a one-off code with this order's price in it." : "11 = static: the same printed code every time; the customer types the amount.";
+    if (id === "26") why = which === "id" ? "Which bank or e-wallet signed the stall up, and the stall's ID with them." : "Who to pay: a PayID. The scheme ID here is invented for this demo.";
+    if (id === "52") why = val === "5812" ? "5812 = restaurants and eating places." : "Type of business.";
+    if (id === "53") why = val === "360" ? "360 = Indonesian rupiah." : val === "036" ? "036 = Australian dollar." : "ISO currency number.";
+    if (id === "58") why = val === "ID" ? "ID = Indonesia." : val === "AU" ? "AU = Australia." : "Two-letter country code.";
+    if (id === "54") why = (which === "id" ? "Rp " + Number(val).toLocaleString("id-ID") : "A$" + val) + ". " + TOP["54"][1];
+    return { name: name, why: why };
+  }
+  function describeSub(parent, id, val, which) {
+    if (parent === "62") {
+      return ({
+        "01": ["Bill number", "The stall's reference for this order."],
+        "05": ["Reference", "Shows on the stall's bank statement so they know which order was paid."],
+        "07": ["Till label", "Which counter or till the code came from."]
+      })[id] || ["Sub-tag " + id, ""];
+    }
+    if (parent === "26" && which === "au") {
+      return ({
+        "00": ["Scheme ID", "Which payment system this is. Made up for the demo; there's no published AU scheme ID yet."],
+        "01": ["PayID", "The stall's PayID. Your bank looks this up and shows the business name."],
+        "02": ["PayID type", "Email, mobile number or ABN."]
+      })[id] || ["Sub-tag " + id, ""];
+    }
+    return ({
+      "00": ["Provider ID", parent === "51" ? "ID.CO.QRIS.WWW marks the national QRIS block." : "Reverse web address of the bank or e-wallet (fake here)."],
+      "01": ["Merchant PAN", "A routing number the switch uses to find the stall's account (fake here)."],
+      "02": [parent === "51" ? "NMID (national merchant ID)" : "Merchant ID", parent === "51" ? "The stall's unique ID across all of Indonesia. This one says DEMO." : "The stall's ID with that bank or e-wallet (fake here)."],
+      "03": ["Business size", val === "UMI" ? "UMI = micro business, which gets the lowest fees." : "UMI micro · UKE small · UME medium · UBE large."]
+    })[id] || ["Sub-tag " + id, ""];
+  }
+
+  // ---------- Decoder ----------
+  function parse(str) {
+    var out = [], i = 0;
+    while (i < str.length) {
+      var id = str.substr(i, 2), len = parseInt(str.substr(i + 2, 2), 10);
+      if (!/^\d\d$/.test(id) || isNaN(len) || i + 4 + len > str.length) throw new Error("Broken block at position " + i);
+      out.push({ id: id, len: len, val: str.substr(i + 4, len), start: i, end: i + 4 + len });
+      i += 4 + len;
+    }
+    return out;
+  }
+  function esc(s) {
+    return String(s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; });
+  }
+  function pad2(n) { return (n < 10 ? "0" : "") + n; }
+
+  // ---------- QR drawing ----------
+  // The two QR squares are pre-built from SAMPLES.id and SAMPLES.au (error correction Q,
+  // so the DEMO badge in the middle doesn't stop them scanning). No library or network needed.
+  // If you change a sample payload, regenerate these: n = modules per side, d = SVG path of dark modules.
+  var QR = {"id":{"n":73,"d":"M0 0h7v1h-7zM9 0h1v1h-1zM11 0h5v1h-5zM18 0h2v1h-2zM22 0h2v1h-2zM26 0h1v1h-1zM28 0h1v1h-1zM31 0h2v1h-2zM36 0h1v1h-1zM39 0h1v1h-1zM42 0h5v1h-5zM48 0h1v1h-1zM50 0h2v1h-2zM56 0h3v1h-3zM60 0h1v1h-1zM62 0h1v1h-1zM64 0h1v1h-1zM66 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM8 1h1v1h-1zM10 1h2v1h-2zM13 1h1v1h-1zM17 1h2v1h-2zM23 1h3v1h-3zM27 1h1v1h-1zM33 1h2v1h-2zM36 1h3v1h-3zM40 1h1v1h-1zM42 1h1v1h-1zM44 1h2v1h-2zM47 1h4v1h-4zM53 1h2v1h-2zM56 1h2v1h-2zM60 1h1v1h-1zM62 1h1v1h-1zM66 1h1v1h-1zM72 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM8 2h2v1h-2zM11 2h5v1h-5zM17 2h2v1h-2zM20 2h1v1h-1zM24 2h2v1h-2zM28 2h3v1h-3zM33 2h4v1h-4zM40 2h4v1h-4zM46 2h1v1h-1zM48 2h6v1h-6zM55 2h2v1h-2zM59 2h1v1h-1zM61 2h1v1h-1zM66 2h1v1h-1zM68 2h3v1h-3zM72 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM13 3h3v1h-3zM17 3h1v1h-1zM19 3h6v1h-6zM27 3h5v1h-5zM33 3h1v1h-1zM37 3h2v1h-2zM40 3h1v1h-1zM43 3h1v1h-1zM45 3h4v1h-4zM50 3h4v1h-4zM56 3h2v1h-2zM62 3h2v1h-2zM66 3h1v1h-1zM68 3h3v1h-3zM72 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM11 4h1v1h-1zM17 4h1v1h-1zM20 4h2v1h-2zM24 4h5v1h-5zM32 4h1v1h-1zM35 4h1v1h-1zM38 4h2v1h-2zM42 4h1v1h-1zM44 4h5v1h-5zM51 4h2v1h-2zM56 4h1v1h-1zM59 4h2v1h-2zM63 4h2v1h-2zM66 4h1v1h-1zM68 4h3v1h-3zM72 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM13 5h1v1h-1zM15 5h1v1h-1zM17 5h3v1h-3zM21 5h2v1h-2zM24 5h1v1h-1zM28 5h1v1h-1zM30 5h2v1h-2zM33 5h1v1h-1zM35 5h1v1h-1zM37 5h1v1h-1zM39 5h2v1h-2zM44 5h1v1h-1zM48 5h4v1h-4zM54 5h3v1h-3zM60 5h1v1h-1zM62 5h1v1h-1zM66 5h1v1h-1zM72 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h1v1h-1zM28 6h1v1h-1zM30 6h1v1h-1zM32 6h1v1h-1zM34 6h1v1h-1zM36 6h1v1h-1zM38 6h1v1h-1zM40 6h1v1h-1zM42 6h1v1h-1zM44 6h1v1h-1zM46 6h1v1h-1zM48 6h1v1h-1zM50 6h1v1h-1zM52 6h1v1h-1zM54 6h1v1h-1zM56 6h1v1h-1zM58 6h1v1h-1zM60 6h1v1h-1zM62 6h1v1h-1zM64 6h1v1h-1zM66 6h7v1h-7zM9 7h1v1h-1zM11 7h2v1h-2zM15 7h2v1h-2zM18 7h2v1h-2zM21 7h1v1h-1zM23 7h2v1h-2zM28 7h1v1h-1zM30 7h1v1h-1zM33 7h3v1h-3zM41 7h1v1h-1zM43 7h2v1h-2zM48 7h1v1h-1zM50 7h2v1h-2zM53 7h1v1h-1zM55 7h2v1h-2zM64 7h1v1h-1zM1 8h3v1h-3zM5 8h2v1h-2zM9 8h1v1h-1zM14 8h1v1h-1zM16 8h1v1h-1zM18 8h2v1h-2zM21 8h11v1h-11zM33 8h1v1h-1zM35 8h1v1h-1zM39 8h1v1h-1zM42 8h1v1h-1zM44 8h6v1h-6zM52 8h1v1h-1zM55 8h4v1h-4zM60 8h3v1h-3zM70 8h2v1h-2zM0 9h2v1h-2zM3 9h3v1h-3zM7 9h3v1h-3zM11 9h1v1h-1zM13 9h1v1h-1zM18 9h1v1h-1zM20 9h3v1h-3zM24 9h2v1h-2zM27 9h1v1h-1zM30 9h2v1h-2zM37 9h1v1h-1zM39 9h1v1h-1zM42 9h3v1h-3zM51 9h1v1h-1zM54 9h1v1h-1zM57 9h1v1h-1zM60 9h1v1h-1zM62 9h2v1h-2zM68 9h2v1h-2zM71 9h1v1h-1zM0 10h1v1h-1zM2 10h2v1h-2zM6 10h2v1h-2zM9 10h3v1h-3zM13 10h1v1h-1zM15 10h1v1h-1zM17 10h2v1h-2zM20 10h2v1h-2zM28 10h2v1h-2zM32 10h2v1h-2zM39 10h2v1h-2zM42 10h1v1h-1zM44 10h4v1h-4zM49 10h2v1h-2zM58 10h1v1h-1zM63 10h2v1h-2zM68 10h1v1h-1zM71 10h1v1h-1zM0 11h2v1h-2zM5 11h1v1h-1zM11 11h1v1h-1zM14 11h1v1h-1zM16 11h1v1h-1zM18 11h4v1h-4zM27 11h1v1h-1zM29 11h1v1h-1zM34 11h2v1h-2zM40 11h4v1h-4zM45 11h1v1h-1zM49 11h2v1h-2zM53 11h4v1h-4zM60 11h2v1h-2zM63 11h2v1h-2zM69 11h1v1h-1zM72 11h1v1h-1zM0 12h2v1h-2zM3 12h7v1h-7zM11 12h1v1h-1zM13 12h1v1h-1zM18 12h3v1h-3zM22 12h1v1h-1zM24 12h1v1h-1zM26 12h3v1h-3zM34 12h3v1h-3zM41 12h2v1h-2zM45 12h2v1h-2zM53 12h1v1h-1zM56 12h2v1h-2zM60 12h5v1h-5zM66 12h2v1h-2zM70 12h1v1h-1zM72 12h1v1h-1zM2 13h3v1h-3zM7 13h3v1h-3zM12 13h1v1h-1zM16 13h1v1h-1zM18 13h1v1h-1zM21 13h5v1h-5zM27 13h3v1h-3zM31 13h2v1h-2zM34 13h3v1h-3zM38 13h1v1h-1zM40 13h1v1h-1zM43 13h1v1h-1zM45 13h1v1h-1zM50 13h4v1h-4zM55 13h1v1h-1zM58 13h2v1h-2zM62 13h1v1h-1zM64 13h4v1h-4zM69 13h1v1h-1zM71 13h1v1h-1zM0 14h1v1h-1zM2 14h1v1h-1zM4 14h5v1h-5zM10 14h1v1h-1zM13 14h1v1h-1zM15 14h1v1h-1zM17 14h4v1h-4zM23 14h2v1h-2zM27 14h1v1h-1zM30 14h3v1h-3zM36 14h1v1h-1zM38 14h3v1h-3zM43 14h1v1h-1zM47 14h2v1h-2zM51 14h1v1h-1zM54 14h1v1h-1zM56 14h3v1h-3zM67 14h1v1h-1zM71 14h1v1h-1zM2 15h1v1h-1zM4 15h1v1h-1zM7 15h2v1h-2zM11 15h1v1h-1zM15 15h4v1h-4zM20 15h1v1h-1zM22 15h4v1h-4zM27 15h1v1h-1zM29 15h1v1h-1zM33 15h1v1h-1zM35 15h1v1h-1zM37 15h3v1h-3zM41 15h2v1h-2zM45 15h1v1h-1zM47 15h1v1h-1zM50 15h1v1h-1zM54 15h1v1h-1zM56 15h3v1h-3zM62 15h2v1h-2zM65 15h1v1h-1zM67 15h1v1h-1zM69 15h1v1h-1zM71 15h1v1h-1zM0 16h1v1h-1zM4 16h1v1h-1zM6 16h2v1h-2zM10 16h1v1h-1zM13 16h4v1h-4zM18 16h3v1h-3zM24 16h1v1h-1zM27 16h2v1h-2zM30 16h2v1h-2zM34 16h4v1h-4zM41 16h3v1h-3zM49 16h1v1h-1zM52 16h2v1h-2zM56 16h4v1h-4zM64 16h2v1h-2zM69 16h2v1h-2zM0 17h4v1h-4zM5 17h1v1h-1zM7 17h1v1h-1zM9 17h1v1h-1zM12 17h2v1h-2zM17 17h2v1h-2zM21 17h1v1h-1zM23 17h1v1h-1zM25 17h1v1h-1zM27 17h1v1h-1zM29 17h1v1h-1zM31 17h1v1h-1zM33 17h8v1h-8zM43 17h4v1h-4zM48 17h4v1h-4zM58 17h2v1h-2zM61 17h1v1h-1zM66 17h2v1h-2zM70 17h3v1h-3zM1 18h2v1h-2zM6 18h1v1h-1zM9 18h6v1h-6zM16 18h2v1h-2zM20 18h1v1h-1zM23 18h2v1h-2zM26 18h2v1h-2zM30 18h1v1h-1zM40 18h2v1h-2zM45 18h2v1h-2zM48 18h1v1h-1zM50 18h1v1h-1zM53 18h2v1h-2zM56 18h3v1h-3zM61 18h1v1h-1zM63 18h2v1h-2zM66 18h5v1h-5zM72 18h1v1h-1zM1 19h3v1h-3zM7 19h3v1h-3zM14 19h1v1h-1zM17 19h1v1h-1zM19 19h7v1h-7zM28 19h3v1h-3zM32 19h1v1h-1zM37 19h1v1h-1zM40 19h2v1h-2zM43 19h1v1h-1zM47 19h1v1h-1zM52 19h6v1h-6zM64 19h1v1h-1zM66 19h1v1h-1zM68 19h2v1h-2zM71 19h1v1h-1zM0 20h1v1h-1zM2 20h1v1h-1zM6 20h1v1h-1zM11 20h1v1h-1zM13 20h1v1h-1zM16 20h1v1h-1zM18 20h2v1h-2zM24 20h1v1h-1zM26 20h1v1h-1zM28 20h1v1h-1zM31 20h2v1h-2zM37 20h4v1h-4zM47 20h1v1h-1zM49 20h1v1h-1zM55 20h1v1h-1zM57 20h1v1h-1zM60 20h2v1h-2zM63 20h2v1h-2zM68 20h1v1h-1zM70 20h1v1h-1zM5 21h1v1h-1zM7 21h6v1h-6zM14 21h2v1h-2zM18 21h7v1h-7zM26 21h3v1h-3zM31 21h2v1h-2zM34 21h3v1h-3zM38 21h3v1h-3zM42 21h3v1h-3zM51 21h2v1h-2zM54 21h1v1h-1zM60 21h1v1h-1zM63 21h3v1h-3zM69 21h3v1h-3zM0 22h3v1h-3zM4 22h9v1h-9zM16 22h1v1h-1zM19 22h2v1h-2zM22 22h4v1h-4zM27 22h2v1h-2zM30 22h1v1h-1zM33 22h1v1h-1zM35 22h1v1h-1zM37 22h1v1h-1zM39 22h1v1h-1zM42 22h1v1h-1zM44 22h1v1h-1zM46 22h1v1h-1zM48 22h3v1h-3zM52 22h3v1h-3zM58 22h1v1h-1zM60 22h3v1h-3zM65 22h1v1h-1zM67 22h1v1h-1zM69 22h1v1h-1zM71 22h1v1h-1zM0 23h2v1h-2zM3 23h1v1h-1zM5 23h1v1h-1zM7 23h2v1h-2zM11 23h1v1h-1zM13 23h5v1h-5zM19 23h2v1h-2zM22 23h3v1h-3zM27 23h1v1h-1zM29 23h1v1h-1zM33 23h1v1h-1zM35 23h1v1h-1zM37 23h4v1h-4zM43 23h1v1h-1zM46 23h7v1h-7zM58 23h2v1h-2zM63 23h5v1h-5zM70 23h1v1h-1zM0 24h1v1h-1zM2 24h7v1h-7zM10 24h2v1h-2zM13 24h1v1h-1zM15 24h1v1h-1zM18 24h1v1h-1zM22 24h1v1h-1zM24 24h6v1h-6zM31 24h4v1h-4zM36 24h4v1h-4zM41 24h2v1h-2zM44 24h5v1h-5zM50 24h3v1h-3zM54 24h1v1h-1zM57 24h1v1h-1zM61 24h1v1h-1zM64 24h5v1h-5zM70 24h1v1h-1zM72 24h1v1h-1zM2 25h1v1h-1zM4 25h1v1h-1zM8 25h1v1h-1zM11 25h1v1h-1zM14 25h3v1h-3zM19 25h1v1h-1zM24 25h1v1h-1zM28 25h4v1h-4zM33 25h2v1h-2zM36 25h1v1h-1zM38 25h1v1h-1zM41 25h1v1h-1zM44 25h1v1h-1zM48 25h1v1h-1zM53 25h1v1h-1zM55 25h2v1h-2zM60 25h1v1h-1zM64 25h1v1h-1zM68 25h1v1h-1zM71 25h1v1h-1zM0 26h2v1h-2zM4 26h1v1h-1zM6 26h1v1h-1zM8 26h1v1h-1zM15 26h4v1h-4zM22 26h1v1h-1zM24 26h1v1h-1zM26 26h1v1h-1zM28 26h6v1h-6zM36 26h2v1h-2zM39 26h4v1h-4zM44 26h1v1h-1zM46 26h1v1h-1zM48 26h1v1h-1zM53 26h1v1h-1zM55 26h1v1h-1zM57 26h6v1h-6zM64 26h1v1h-1zM66 26h1v1h-1zM68 26h4v1h-4zM1 27h1v1h-1zM4 27h1v1h-1zM8 27h3v1h-3zM12 27h1v1h-1zM14 27h1v1h-1zM17 27h1v1h-1zM20 27h1v1h-1zM22 27h1v1h-1zM24 27h1v1h-1zM28 27h6v1h-6zM38 27h1v1h-1zM40 27h1v1h-1zM43 27h2v1h-2zM48 27h1v1h-1zM50 27h3v1h-3zM56 27h1v1h-1zM58 27h3v1h-3zM64 27h1v1h-1zM68 27h2v1h-2zM72 27h1v1h-1zM2 28h10v1h-10zM14 28h1v1h-1zM18 28h1v1h-1zM20 28h1v1h-1zM24 28h5v1h-5zM33 28h1v1h-1zM36 28h3v1h-3zM40 28h1v1h-1zM44 28h5v1h-5zM53 28h2v1h-2zM59 28h1v1h-1zM63 28h8v1h-8zM0 29h1v1h-1zM3 29h3v1h-3zM10 29h1v1h-1zM12 29h4v1h-4zM17 29h2v1h-2zM21 29h1v1h-1zM23 29h2v1h-2zM27 29h1v1h-1zM31 29h1v1h-1zM33 29h1v1h-1zM35 29h3v1h-3zM39 29h3v1h-3zM43 29h1v1h-1zM46 29h2v1h-2zM49 29h2v1h-2zM52 29h1v1h-1zM55 29h2v1h-2zM61 29h2v1h-2zM67 29h1v1h-1zM70 29h3v1h-3zM0 30h1v1h-1zM5 30h3v1h-3zM11 30h1v1h-1zM14 30h2v1h-2zM18 30h1v1h-1zM22 30h1v1h-1zM25 30h1v1h-1zM27 30h1v1h-1zM30 30h1v1h-1zM33 30h2v1h-2zM36 30h1v1h-1zM39 30h1v1h-1zM42 30h2v1h-2zM49 30h1v1h-1zM51 30h4v1h-4zM57 30h2v1h-2zM61 30h1v1h-1zM64 30h1v1h-1zM66 30h1v1h-1zM70 30h1v1h-1zM72 30h1v1h-1zM1 31h1v1h-1zM3 31h2v1h-2zM8 31h1v1h-1zM10 31h2v1h-2zM15 31h2v1h-2zM18 31h2v1h-2zM22 31h3v1h-3zM26 31h2v1h-2zM29 31h2v1h-2zM34 31h3v1h-3zM40 31h2v1h-2zM46 31h3v1h-3zM52 31h1v1h-1zM54 31h3v1h-3zM59 31h2v1h-2zM65 31h1v1h-1zM67 31h1v1h-1zM71 31h1v1h-1zM0 32h1v1h-1zM4 32h1v1h-1zM6 32h1v1h-1zM9 32h1v1h-1zM12 32h2v1h-2zM16 32h4v1h-4zM21 32h2v1h-2zM25 32h1v1h-1zM27 32h1v1h-1zM34 32h1v1h-1zM37 32h1v1h-1zM40 32h2v1h-2zM46 32h1v1h-1zM53 32h5v1h-5zM60 32h1v1h-1zM62 32h1v1h-1zM64 32h4v1h-4zM69 32h1v1h-1zM72 32h1v1h-1zM3 33h2v1h-2zM7 33h1v1h-1zM11 33h6v1h-6zM18 33h3v1h-3zM24 33h2v1h-2zM28 33h3v1h-3zM35 33h1v1h-1zM39 33h1v1h-1zM42 33h1v1h-1zM45 33h1v1h-1zM51 33h1v1h-1zM54 33h2v1h-2zM57 33h3v1h-3zM62 33h2v1h-2zM66 33h1v1h-1zM70 33h2v1h-2zM6 34h1v1h-1zM8 34h2v1h-2zM12 34h1v1h-1zM14 34h4v1h-4zM21 34h1v1h-1zM23 34h1v1h-1zM25 34h2v1h-2zM30 34h2v1h-2zM33 34h1v1h-1zM35 34h1v1h-1zM37 34h2v1h-2zM42 34h1v1h-1zM44 34h2v1h-2zM47 34h2v1h-2zM52 34h3v1h-3zM58 34h2v1h-2zM61 34h5v1h-5zM67 34h2v1h-2zM70 34h2v1h-2zM0 35h1v1h-1zM2 35h1v1h-1zM4 35h2v1h-2zM8 35h3v1h-3zM12 35h2v1h-2zM15 35h1v1h-1zM17 35h4v1h-4zM24 35h1v1h-1zM26 35h1v1h-1zM28 35h1v1h-1zM32 35h1v1h-1zM35 35h1v1h-1zM37 35h2v1h-2zM40 35h1v1h-1zM43 35h2v1h-2zM48 35h7v1h-7zM60 35h1v1h-1zM62 35h1v1h-1zM64 35h1v1h-1zM67 35h1v1h-1zM69 35h4v1h-4zM1 36h3v1h-3zM6 36h2v1h-2zM11 36h1v1h-1zM13 36h1v1h-1zM15 36h2v1h-2zM18 36h2v1h-2zM24 36h1v1h-1zM26 36h1v1h-1zM29 36h3v1h-3zM34 36h1v1h-1zM36 36h1v1h-1zM39 36h5v1h-5zM45 36h1v1h-1zM48 36h2v1h-2zM51 36h1v1h-1zM56 36h2v1h-2zM60 36h4v1h-4zM65 36h1v1h-1zM67 36h1v1h-1zM69 36h1v1h-1zM72 36h1v1h-1zM2 37h1v1h-1zM5 37h1v1h-1zM7 37h1v1h-1zM13 37h2v1h-2zM18 37h1v1h-1zM20 37h2v1h-2zM24 37h2v1h-2zM28 37h1v1h-1zM30 37h1v1h-1zM32 37h6v1h-6zM41 37h1v1h-1zM44 37h1v1h-1zM46 37h3v1h-3zM50 37h1v1h-1zM53 37h2v1h-2zM56 37h1v1h-1zM59 37h1v1h-1zM61 37h2v1h-2zM66 37h2v1h-2zM70 37h1v1h-1zM72 37h1v1h-1zM0 38h2v1h-2zM5 38h2v1h-2zM8 38h2v1h-2zM14 38h2v1h-2zM17 38h2v1h-2zM20 38h2v1h-2zM25 38h2v1h-2zM28 38h2v1h-2zM31 38h2v1h-2zM34 38h1v1h-1zM38 38h1v1h-1zM41 38h2v1h-2zM45 38h2v1h-2zM48 38h4v1h-4zM54 38h9v1h-9zM64 38h1v1h-1zM66 38h2v1h-2zM69 38h2v1h-2zM3 39h1v1h-1zM5 39h1v1h-1zM9 39h1v1h-1zM14 39h2v1h-2zM17 39h2v1h-2zM22 39h1v1h-1zM24 39h1v1h-1zM26 39h1v1h-1zM31 39h4v1h-4zM39 39h4v1h-4zM45 39h2v1h-2zM54 39h2v1h-2zM57 39h4v1h-4zM63 39h1v1h-1zM65 39h4v1h-4zM72 39h1v1h-1zM0 40h1v1h-1zM3 40h1v1h-1zM6 40h6v1h-6zM16 40h3v1h-3zM20 40h4v1h-4zM28 40h1v1h-1zM32 40h1v1h-1zM34 40h1v1h-1zM36 40h1v1h-1zM38 40h2v1h-2zM47 40h2v1h-2zM50 40h1v1h-1zM53 40h1v1h-1zM56 40h1v1h-1zM59 40h1v1h-1zM62 40h4v1h-4zM68 40h1v1h-1zM71 40h1v1h-1zM4 41h2v1h-2zM7 41h2v1h-2zM12 41h7v1h-7zM20 41h3v1h-3zM26 41h1v1h-1zM28 41h2v1h-2zM31 41h2v1h-2zM34 41h1v1h-1zM39 41h1v1h-1zM43 41h1v1h-1zM46 41h2v1h-2zM49 41h1v1h-1zM55 41h1v1h-1zM58 41h2v1h-2zM61 41h1v1h-1zM64 41h1v1h-1zM66 41h2v1h-2zM70 41h1v1h-1zM1 42h3v1h-3zM5 42h2v1h-2zM9 42h3v1h-3zM13 42h5v1h-5zM21 42h1v1h-1zM23 42h2v1h-2zM28 42h3v1h-3zM32 42h2v1h-2zM35 42h2v1h-2zM38 42h4v1h-4zM44 42h1v1h-1zM48 42h2v1h-2zM51 42h4v1h-4zM56 42h1v1h-1zM61 42h1v1h-1zM64 42h3v1h-3zM70 42h3v1h-3zM2 43h1v1h-1zM5 43h1v1h-1zM8 43h2v1h-2zM11 43h1v1h-1zM13 43h1v1h-1zM15 43h2v1h-2zM21 43h1v1h-1zM23 43h2v1h-2zM28 43h2v1h-2zM34 43h6v1h-6zM45 43h3v1h-3zM49 43h1v1h-1zM51 43h1v1h-1zM53 43h4v1h-4zM58 43h2v1h-2zM65 43h1v1h-1zM68 43h1v1h-1zM2 44h1v1h-1zM4 44h5v1h-5zM10 44h1v1h-1zM12 44h4v1h-4zM18 44h2v1h-2zM21 44h9v1h-9zM32 44h1v1h-1zM34 44h1v1h-1zM38 44h4v1h-4zM44 44h7v1h-7zM54 44h2v1h-2zM60 44h2v1h-2zM64 44h6v1h-6zM71 44h1v1h-1zM3 45h2v1h-2zM8 45h1v1h-1zM12 45h1v1h-1zM15 45h3v1h-3zM19 45h1v1h-1zM23 45h2v1h-2zM28 45h1v1h-1zM30 45h2v1h-2zM33 45h1v1h-1zM38 45h3v1h-3zM42 45h1v1h-1zM44 45h1v1h-1zM48 45h1v1h-1zM50 45h1v1h-1zM52 45h1v1h-1zM57 45h2v1h-2zM60 45h1v1h-1zM62 45h3v1h-3zM68 45h2v1h-2zM1 46h1v1h-1zM4 46h1v1h-1zM6 46h1v1h-1zM8 46h1v1h-1zM11 46h1v1h-1zM17 46h1v1h-1zM24 46h1v1h-1zM26 46h1v1h-1zM28 46h2v1h-2zM33 46h3v1h-3zM37 46h1v1h-1zM39 46h1v1h-1zM42 46h1v1h-1zM44 46h1v1h-1zM46 46h1v1h-1zM48 46h1v1h-1zM51 46h2v1h-2zM57 46h1v1h-1zM59 46h4v1h-4zM64 46h1v1h-1zM66 46h1v1h-1zM68 46h1v1h-1zM71 46h1v1h-1zM0 47h1v1h-1zM3 47h2v1h-2zM8 47h1v1h-1zM15 47h2v1h-2zM18 47h3v1h-3zM22 47h3v1h-3zM28 47h1v1h-1zM30 47h2v1h-2zM35 47h1v1h-1zM40 47h1v1h-1zM43 47h2v1h-2zM48 47h2v1h-2zM54 47h1v1h-1zM57 47h1v1h-1zM59 47h1v1h-1zM62 47h1v1h-1zM64 47h1v1h-1zM68 47h1v1h-1zM70 47h1v1h-1zM0 48h1v1h-1zM2 48h7v1h-7zM11 48h1v1h-1zM13 48h1v1h-1zM15 48h5v1h-5zM21 48h2v1h-2zM24 48h6v1h-6zM32 48h1v1h-1zM34 48h1v1h-1zM36 48h1v1h-1zM40 48h1v1h-1zM42 48h1v1h-1zM44 48h5v1h-5zM51 48h3v1h-3zM56 48h2v1h-2zM60 48h3v1h-3zM64 48h5v1h-5zM70 48h3v1h-3zM0 49h1v1h-1zM2 49h1v1h-1zM4 49h2v1h-2zM7 49h1v1h-1zM11 49h2v1h-2zM18 49h3v1h-3zM22 49h1v1h-1zM24 49h5v1h-5zM30 49h1v1h-1zM32 49h2v1h-2zM36 49h1v1h-1zM38 49h3v1h-3zM44 49h5v1h-5zM50 49h6v1h-6zM58 49h2v1h-2zM62 49h2v1h-2zM66 49h3v1h-3zM72 49h1v1h-1zM3 50h5v1h-5zM9 50h7v1h-7zM18 50h3v1h-3zM26 50h1v1h-1zM33 50h3v1h-3zM37 50h2v1h-2zM40 50h1v1h-1zM44 50h1v1h-1zM46 50h2v1h-2zM54 50h2v1h-2zM60 50h3v1h-3zM64 50h2v1h-2zM68 50h1v1h-1zM70 50h1v1h-1zM1 51h1v1h-1zM3 51h3v1h-3zM7 51h3v1h-3zM11 51h2v1h-2zM14 51h2v1h-2zM17 51h2v1h-2zM20 51h3v1h-3zM24 51h1v1h-1zM26 51h1v1h-1zM29 51h3v1h-3zM35 51h3v1h-3zM40 51h3v1h-3zM45 51h2v1h-2zM48 51h1v1h-1zM50 51h1v1h-1zM54 51h2v1h-2zM57 51h4v1h-4zM62 51h1v1h-1zM66 51h1v1h-1zM69 51h1v1h-1zM72 51h1v1h-1zM0 52h1v1h-1zM2 52h1v1h-1zM4 52h1v1h-1zM6 52h2v1h-2zM9 52h1v1h-1zM14 52h1v1h-1zM19 52h1v1h-1zM22 52h1v1h-1zM24 52h3v1h-3zM28 52h1v1h-1zM32 52h2v1h-2zM35 52h4v1h-4zM41 52h4v1h-4zM47 52h1v1h-1zM50 52h1v1h-1zM53 52h2v1h-2zM56 52h1v1h-1zM58 52h2v1h-2zM62 52h1v1h-1zM67 52h1v1h-1zM69 52h3v1h-3zM2 53h2v1h-2zM7 53h2v1h-2zM12 53h2v1h-2zM15 53h1v1h-1zM18 53h3v1h-3zM22 53h3v1h-3zM27 53h1v1h-1zM33 53h3v1h-3zM38 53h1v1h-1zM43 53h1v1h-1zM46 53h5v1h-5zM55 53h2v1h-2zM58 53h1v1h-1zM61 53h1v1h-1zM67 53h1v1h-1zM69 53h4v1h-4zM0 54h3v1h-3zM4 54h1v1h-1zM6 54h1v1h-1zM8 54h1v1h-1zM12 54h1v1h-1zM14 54h8v1h-8zM24 54h4v1h-4zM29 54h1v1h-1zM31 54h1v1h-1zM33 54h1v1h-1zM35 54h1v1h-1zM38 54h1v1h-1zM41 54h1v1h-1zM43 54h6v1h-6zM51 54h4v1h-4zM56 54h3v1h-3zM61 54h1v1h-1zM63 54h2v1h-2zM66 54h2v1h-2zM72 54h1v1h-1zM0 55h6v1h-6zM7 55h1v1h-1zM11 55h1v1h-1zM17 55h6v1h-6zM25 55h2v1h-2zM29 55h1v1h-1zM31 55h1v1h-1zM33 55h4v1h-4zM38 55h1v1h-1zM41 55h1v1h-1zM44 55h1v1h-1zM46 55h2v1h-2zM51 55h1v1h-1zM53 55h1v1h-1zM55 55h2v1h-2zM59 55h3v1h-3zM66 55h1v1h-1zM69 55h1v1h-1zM71 55h2v1h-2zM0 56h2v1h-2zM3 56h2v1h-2zM6 56h1v1h-1zM8 56h1v1h-1zM12 56h1v1h-1zM14 56h2v1h-2zM17 56h1v1h-1zM20 56h5v1h-5zM26 56h1v1h-1zM28 56h1v1h-1zM33 56h2v1h-2zM36 56h1v1h-1zM38 56h2v1h-2zM41 56h1v1h-1zM44 56h1v1h-1zM46 56h1v1h-1zM52 56h5v1h-5zM60 56h3v1h-3zM64 56h2v1h-2zM67 56h1v1h-1zM70 56h1v1h-1zM1 57h2v1h-2zM4 57h1v1h-1zM7 57h1v1h-1zM10 57h1v1h-1zM12 57h6v1h-6zM19 57h1v1h-1zM22 57h2v1h-2zM25 57h2v1h-2zM28 57h1v1h-1zM31 57h1v1h-1zM33 57h1v1h-1zM39 57h2v1h-2zM42 57h1v1h-1zM45 57h1v1h-1zM51 57h1v1h-1zM54 57h1v1h-1zM57 57h2v1h-2zM60 57h1v1h-1zM62 57h1v1h-1zM65 57h3v1h-3zM71 57h1v1h-1zM3 58h7v1h-7zM11 58h1v1h-1zM14 58h1v1h-1zM16 58h1v1h-1zM18 58h2v1h-2zM21 58h3v1h-3zM27 58h1v1h-1zM29 58h1v1h-1zM31 58h2v1h-2zM34 58h1v1h-1zM36 58h2v1h-2zM39 58h2v1h-2zM42 58h1v1h-1zM44 58h1v1h-1zM46 58h1v1h-1zM49 58h2v1h-2zM57 58h1v1h-1zM59 58h1v1h-1zM64 58h1v1h-1zM66 58h6v1h-6zM1 59h1v1h-1zM3 59h1v1h-1zM7 59h3v1h-3zM11 59h1v1h-1zM15 59h2v1h-2zM18 59h1v1h-1zM20 59h1v1h-1zM23 59h1v1h-1zM29 59h2v1h-2zM33 59h1v1h-1zM36 59h2v1h-2zM39 59h1v1h-1zM45 59h2v1h-2zM48 59h1v1h-1zM50 59h1v1h-1zM54 59h2v1h-2zM59 59h1v1h-1zM63 59h1v1h-1zM65 59h3v1h-3zM69 59h2v1h-2zM0 60h2v1h-2zM3 60h2v1h-2zM6 60h1v1h-1zM9 60h3v1h-3zM13 60h1v1h-1zM18 60h3v1h-3zM22 60h2v1h-2zM25 60h3v1h-3zM29 60h1v1h-1zM33 60h1v1h-1zM37 60h3v1h-3zM41 60h3v1h-3zM46 60h2v1h-2zM49 60h3v1h-3zM56 60h3v1h-3zM62 60h1v1h-1zM66 60h4v1h-4zM72 60h1v1h-1zM2 61h3v1h-3zM8 61h3v1h-3zM13 61h1v1h-1zM15 61h3v1h-3zM21 61h2v1h-2zM24 61h2v1h-2zM29 61h3v1h-3zM37 61h2v1h-2zM43 61h2v1h-2zM46 61h3v1h-3zM50 61h1v1h-1zM52 61h2v1h-2zM56 61h1v1h-1zM59 61h2v1h-2zM64 61h3v1h-3zM68 61h2v1h-2zM71 61h1v1h-1zM0 62h2v1h-2zM3 62h1v1h-1zM5 62h2v1h-2zM10 62h3v1h-3zM14 62h2v1h-2zM17 62h2v1h-2zM20 62h6v1h-6zM27 62h5v1h-5zM35 62h3v1h-3zM39 62h3v1h-3zM44 62h1v1h-1zM47 62h1v1h-1zM49 62h2v1h-2zM54 62h2v1h-2zM57 62h6v1h-6zM67 62h1v1h-1zM71 62h1v1h-1zM3 63h2v1h-2zM8 63h1v1h-1zM11 63h1v1h-1zM13 63h1v1h-1zM17 63h1v1h-1zM19 63h2v1h-2zM22 63h2v1h-2zM25 63h2v1h-2zM30 63h2v1h-2zM33 63h1v1h-1zM37 63h1v1h-1zM39 63h1v1h-1zM42 63h1v1h-1zM45 63h2v1h-2zM48 63h2v1h-2zM53 63h2v1h-2zM56 63h5v1h-5zM63 63h1v1h-1zM66 63h1v1h-1zM68 63h2v1h-2zM71 63h1v1h-1zM0 64h1v1h-1zM4 64h1v1h-1zM6 64h1v1h-1zM9 64h2v1h-2zM17 64h3v1h-3zM24 64h10v1h-10zM35 64h2v1h-2zM38 64h2v1h-2zM41 64h1v1h-1zM44 64h5v1h-5zM50 64h1v1h-1zM52 64h3v1h-3zM56 64h2v1h-2zM59 64h2v1h-2zM62 64h9v1h-9zM72 64h1v1h-1zM8 65h1v1h-1zM10 65h1v1h-1zM12 65h1v1h-1zM16 65h3v1h-3zM22 65h1v1h-1zM24 65h1v1h-1zM28 65h1v1h-1zM31 65h3v1h-3zM35 65h1v1h-1zM39 65h1v1h-1zM44 65h1v1h-1zM48 65h2v1h-2zM52 65h1v1h-1zM54 65h3v1h-3zM58 65h1v1h-1zM60 65h5v1h-5zM68 65h2v1h-2zM71 65h2v1h-2zM0 66h7v1h-7zM11 66h1v1h-1zM13 66h1v1h-1zM15 66h2v1h-2zM18 66h1v1h-1zM21 66h4v1h-4zM26 66h1v1h-1zM28 66h1v1h-1zM30 66h1v1h-1zM33 66h3v1h-3zM37 66h3v1h-3zM41 66h1v1h-1zM44 66h1v1h-1zM46 66h1v1h-1zM48 66h2v1h-2zM51 66h1v1h-1zM56 66h1v1h-1zM62 66h1v1h-1zM64 66h1v1h-1zM66 66h1v1h-1zM68 66h1v1h-1zM70 66h1v1h-1zM72 66h1v1h-1zM0 67h1v1h-1zM6 67h1v1h-1zM8 67h2v1h-2zM11 67h1v1h-1zM13 67h3v1h-3zM20 67h1v1h-1zM22 67h1v1h-1zM24 67h1v1h-1zM28 67h2v1h-2zM31 67h1v1h-1zM35 67h1v1h-1zM38 67h4v1h-4zM44 67h1v1h-1zM48 67h2v1h-2zM52 67h2v1h-2zM55 67h4v1h-4zM64 67h1v1h-1zM68 67h2v1h-2zM71 67h2v1h-2zM0 68h1v1h-1zM2 68h3v1h-3zM6 68h1v1h-1zM10 68h2v1h-2zM14 68h1v1h-1zM17 68h1v1h-1zM19 68h3v1h-3zM24 68h6v1h-6zM31 68h2v1h-2zM34 68h1v1h-1zM36 68h3v1h-3zM40 68h2v1h-2zM44 68h7v1h-7zM55 68h3v1h-3zM61 68h1v1h-1zM64 68h8v1h-8zM0 69h1v1h-1zM2 69h3v1h-3zM6 69h1v1h-1zM8 69h1v1h-1zM10 69h8v1h-8zM23 69h2v1h-2zM26 69h3v1h-3zM30 69h1v1h-1zM42 69h1v1h-1zM45 69h1v1h-1zM48 69h1v1h-1zM50 69h1v1h-1zM57 69h1v1h-1zM60 69h1v1h-1zM64 69h1v1h-1zM66 69h4v1h-4zM72 69h1v1h-1zM0 70h1v1h-1zM2 70h3v1h-3zM6 70h1v1h-1zM8 70h2v1h-2zM11 70h1v1h-1zM14 70h2v1h-2zM17 70h1v1h-1zM19 70h1v1h-1zM21 70h1v1h-1zM23 70h4v1h-4zM28 70h1v1h-1zM30 70h1v1h-1zM32 70h1v1h-1zM35 70h2v1h-2zM38 70h1v1h-1zM45 70h4v1h-4zM52 70h2v1h-2zM56 70h1v1h-1zM58 70h2v1h-2zM61 70h2v1h-2zM66 70h1v1h-1zM68 70h2v1h-2zM71 70h1v1h-1zM0 71h1v1h-1zM6 71h1v1h-1zM8 71h2v1h-2zM14 71h3v1h-3zM18 71h1v1h-1zM20 71h1v1h-1zM24 71h1v1h-1zM27 71h2v1h-2zM32 71h4v1h-4zM39 71h1v1h-1zM43 71h1v1h-1zM46 71h2v1h-2zM49 71h1v1h-1zM51 71h2v1h-2zM54 71h3v1h-3zM58 71h1v1h-1zM60 71h1v1h-1zM62 71h3v1h-3zM69 71h2v1h-2zM0 72h7v1h-7zM10 72h2v1h-2zM13 72h1v1h-1zM17 72h1v1h-1zM19 72h5v1h-5zM28 72h1v1h-1zM30 72h2v1h-2zM33 72h5v1h-5zM39 72h1v1h-1zM42 72h1v1h-1zM44 72h1v1h-1zM48 72h1v1h-1zM51 72h2v1h-2zM54 72h1v1h-1zM57 72h2v1h-2zM62 72h1v1h-1zM65 72h1v1h-1zM67 72h1v1h-1zM69 72h1v1h-1zM71 72h2v1h-2z"},"au":{"n":61,"d":"M0 0h7v1h-7zM8 0h1v1h-1zM11 0h1v1h-1zM16 0h8v1h-8zM26 0h2v1h-2zM30 0h1v1h-1zM33 0h1v1h-1zM37 0h1v1h-1zM39 0h7v1h-7zM48 0h1v1h-1zM51 0h2v1h-2zM54 0h7v1h-7zM0 1h1v1h-1zM6 1h1v1h-1zM9 1h3v1h-3zM16 1h3v1h-3zM20 1h1v1h-1zM23 1h4v1h-4zM28 1h1v1h-1zM31 1h1v1h-1zM34 1h4v1h-4zM39 1h1v1h-1zM42 1h2v1h-2zM46 1h1v1h-1zM48 1h1v1h-1zM51 1h2v1h-2zM54 1h1v1h-1zM60 1h1v1h-1zM0 2h1v1h-1zM2 2h3v1h-3zM6 2h1v1h-1zM10 2h1v1h-1zM12 2h1v1h-1zM19 2h1v1h-1zM21 2h1v1h-1zM28 2h1v1h-1zM33 2h1v1h-1zM36 2h2v1h-2zM40 2h1v1h-1zM42 2h7v1h-7zM50 2h3v1h-3zM54 2h1v1h-1zM56 2h3v1h-3zM60 2h1v1h-1zM0 3h1v1h-1zM2 3h3v1h-3zM6 3h1v1h-1zM10 3h3v1h-3zM15 3h1v1h-1zM18 3h1v1h-1zM21 3h1v1h-1zM23 3h3v1h-3zM32 3h1v1h-1zM35 3h2v1h-2zM38 3h2v1h-2zM41 3h2v1h-2zM48 3h1v1h-1zM50 3h1v1h-1zM52 3h1v1h-1zM54 3h1v1h-1zM56 3h3v1h-3zM60 3h1v1h-1zM0 4h1v1h-1zM2 4h3v1h-3zM6 4h1v1h-1zM8 4h1v1h-1zM11 4h1v1h-1zM14 4h1v1h-1zM17 4h2v1h-2zM20 4h1v1h-1zM24 4h10v1h-10zM37 4h1v1h-1zM40 4h1v1h-1zM42 4h1v1h-1zM47 4h5v1h-5zM54 4h1v1h-1zM56 4h3v1h-3zM60 4h1v1h-1zM0 5h1v1h-1zM6 5h1v1h-1zM8 5h2v1h-2zM12 5h1v1h-1zM14 5h2v1h-2zM19 5h4v1h-4zM25 5h1v1h-1zM27 5h2v1h-2zM32 5h1v1h-1zM35 5h1v1h-1zM37 5h1v1h-1zM39 5h1v1h-1zM41 5h5v1h-5zM48 5h3v1h-3zM54 5h1v1h-1zM60 5h1v1h-1zM0 6h7v1h-7zM8 6h1v1h-1zM10 6h1v1h-1zM12 6h1v1h-1zM14 6h1v1h-1zM16 6h1v1h-1zM18 6h1v1h-1zM20 6h1v1h-1zM22 6h1v1h-1zM24 6h1v1h-1zM26 6h1v1h-1zM28 6h1v1h-1zM30 6h1v1h-1zM32 6h1v1h-1zM34 6h1v1h-1zM36 6h1v1h-1zM38 6h1v1h-1zM40 6h1v1h-1zM42 6h1v1h-1zM44 6h1v1h-1zM46 6h1v1h-1zM48 6h1v1h-1zM50 6h1v1h-1zM52 6h1v1h-1zM54 6h7v1h-7zM10 7h1v1h-1zM12 7h1v1h-1zM15 7h1v1h-1zM18 7h1v1h-1zM20 7h4v1h-4zM28 7h1v1h-1zM32 7h1v1h-1zM36 7h3v1h-3zM40 7h1v1h-1zM42 7h3v1h-3zM48 7h1v1h-1zM50 7h2v1h-2zM1 8h7v1h-7zM9 8h1v1h-1zM11 8h1v1h-1zM15 8h3v1h-3zM22 8h1v1h-1zM28 8h5v1h-5zM35 8h2v1h-2zM38 8h2v1h-2zM47 8h2v1h-2zM51 8h2v1h-2zM55 8h2v1h-2zM60 8h1v1h-1zM0 9h4v1h-4zM11 9h3v1h-3zM15 9h2v1h-2zM18 9h2v1h-2zM21 9h1v1h-1zM23 9h2v1h-2zM26 9h1v1h-1zM28 9h1v1h-1zM32 9h2v1h-2zM36 9h2v1h-2zM39 9h1v1h-1zM42 9h1v1h-1zM44 9h1v1h-1zM54 9h1v1h-1zM59 9h1v1h-1zM0 10h1v1h-1zM2 10h1v1h-1zM5 10h3v1h-3zM9 10h2v1h-2zM13 10h2v1h-2zM16 10h2v1h-2zM20 10h1v1h-1zM23 10h2v1h-2zM26 10h3v1h-3zM30 10h1v1h-1zM32 10h1v1h-1zM36 10h1v1h-1zM39 10h1v1h-1zM41 10h1v1h-1zM46 10h2v1h-2zM49 10h2v1h-2zM53 10h1v1h-1zM60 10h1v1h-1zM4 11h2v1h-2zM7 11h1v1h-1zM13 11h1v1h-1zM17 11h5v1h-5zM23 11h1v1h-1zM26 11h3v1h-3zM30 11h1v1h-1zM33 11h2v1h-2zM36 11h1v1h-1zM39 11h2v1h-2zM42 11h4v1h-4zM47 11h4v1h-4zM54 11h3v1h-3zM60 11h1v1h-1zM1 12h1v1h-1zM4 12h1v1h-1zM6 12h1v1h-1zM8 12h1v1h-1zM12 12h1v1h-1zM14 12h2v1h-2zM20 12h1v1h-1zM22 12h5v1h-5zM28 12h3v1h-3zM32 12h1v1h-1zM35 12h1v1h-1zM37 12h1v1h-1zM41 12h2v1h-2zM47 12h2v1h-2zM50 12h3v1h-3zM54 12h1v1h-1zM57 12h1v1h-1zM59 12h2v1h-2zM3 13h2v1h-2zM7 13h3v1h-3zM11 13h1v1h-1zM13 13h2v1h-2zM16 13h1v1h-1zM18 13h2v1h-2zM22 13h4v1h-4zM27 13h2v1h-2zM30 13h3v1h-3zM34 13h1v1h-1zM39 13h1v1h-1zM42 13h4v1h-4zM48 13h2v1h-2zM51 13h1v1h-1zM54 13h1v1h-1zM57 13h2v1h-2zM60 13h1v1h-1zM0 14h1v1h-1zM3 14h1v1h-1zM6 14h2v1h-2zM9 14h2v1h-2zM13 14h4v1h-4zM22 14h2v1h-2zM26 14h1v1h-1zM28 14h6v1h-6zM35 14h1v1h-1zM37 14h1v1h-1zM39 14h1v1h-1zM41 14h1v1h-1zM46 14h1v1h-1zM48 14h1v1h-1zM52 14h1v1h-1zM55 14h2v1h-2zM59 14h2v1h-2zM2 15h1v1h-1zM4 15h1v1h-1zM7 15h1v1h-1zM9 15h1v1h-1zM11 15h2v1h-2zM14 15h1v1h-1zM18 15h1v1h-1zM22 15h1v1h-1zM27 15h2v1h-2zM30 15h2v1h-2zM33 15h3v1h-3zM40 15h1v1h-1zM42 15h3v1h-3zM47 15h3v1h-3zM52 15h1v1h-1zM54 15h1v1h-1zM56 15h2v1h-2zM59 15h2v1h-2zM3 16h1v1h-1zM5 16h5v1h-5zM11 16h2v1h-2zM14 16h1v1h-1zM16 16h3v1h-3zM20 16h1v1h-1zM22 16h4v1h-4zM27 16h1v1h-1zM30 16h1v1h-1zM33 16h1v1h-1zM36 16h1v1h-1zM39 16h1v1h-1zM42 16h2v1h-2zM47 16h3v1h-3zM52 16h4v1h-4zM58 16h2v1h-2zM0 17h3v1h-3zM7 17h1v1h-1zM9 17h1v1h-1zM12 17h1v1h-1zM14 17h2v1h-2zM19 17h5v1h-5zM25 17h2v1h-2zM28 17h3v1h-3zM33 17h4v1h-4zM39 17h5v1h-5zM45 17h1v1h-1zM47 17h2v1h-2zM51 17h1v1h-1zM54 17h1v1h-1zM56 17h2v1h-2zM59 17h1v1h-1zM2 18h1v1h-1zM6 18h1v1h-1zM8 18h6v1h-6zM15 18h1v1h-1zM17 18h1v1h-1zM19 18h1v1h-1zM23 18h1v1h-1zM25 18h1v1h-1zM32 18h2v1h-2zM36 18h4v1h-4zM43 18h2v1h-2zM46 18h1v1h-1zM48 18h4v1h-4zM53 18h1v1h-1zM55 18h3v1h-3zM59 18h2v1h-2zM1 19h1v1h-1zM4 19h2v1h-2zM7 19h2v1h-2zM13 19h1v1h-1zM16 19h1v1h-1zM18 19h1v1h-1zM21 19h1v1h-1zM23 19h3v1h-3zM28 19h1v1h-1zM31 19h1v1h-1zM36 19h1v1h-1zM39 19h1v1h-1zM42 19h4v1h-4zM47 19h1v1h-1zM49 19h3v1h-3zM53 19h2v1h-2zM57 19h1v1h-1zM59 19h2v1h-2zM0 20h2v1h-2zM5 20h2v1h-2zM8 20h1v1h-1zM11 20h3v1h-3zM16 20h2v1h-2zM26 20h3v1h-3zM30 20h1v1h-1zM32 20h6v1h-6zM40 20h1v1h-1zM42 20h1v1h-1zM45 20h2v1h-2zM48 20h1v1h-1zM50 20h2v1h-2zM53 20h1v1h-1zM55 20h1v1h-1zM58 20h1v1h-1zM60 20h1v1h-1zM1 21h1v1h-1zM4 21h2v1h-2zM11 21h1v1h-1zM13 21h1v1h-1zM15 21h2v1h-2zM19 21h1v1h-1zM21 21h1v1h-1zM23 21h1v1h-1zM27 21h1v1h-1zM30 21h2v1h-2zM34 21h1v1h-1zM36 21h2v1h-2zM39 21h2v1h-2zM42 21h1v1h-1zM48 21h4v1h-4zM53 21h2v1h-2zM57 21h1v1h-1zM59 21h2v1h-2zM1 22h1v1h-1zM3 22h1v1h-1zM6 22h1v1h-1zM8 22h1v1h-1zM10 22h2v1h-2zM15 22h1v1h-1zM17 22h2v1h-2zM20 22h1v1h-1zM22 22h1v1h-1zM24 22h4v1h-4zM32 22h1v1h-1zM34 22h5v1h-5zM40 22h2v1h-2zM45 22h1v1h-1zM52 22h1v1h-1zM54 22h2v1h-2zM59 22h2v1h-2zM1 23h2v1h-2zM4 23h2v1h-2zM11 23h1v1h-1zM14 23h4v1h-4zM21 23h2v1h-2zM24 23h3v1h-3zM29 23h1v1h-1zM39 23h1v1h-1zM42 23h4v1h-4zM51 23h1v1h-1zM54 23h4v1h-4zM59 23h2v1h-2zM1 24h1v1h-1zM4 24h4v1h-4zM9 24h1v1h-1zM11 24h2v1h-2zM14 24h3v1h-3zM18 24h1v1h-1zM22 24h3v1h-3zM28 24h1v1h-1zM33 24h2v1h-2zM36 24h1v1h-1zM38 24h1v1h-1zM47 24h3v1h-3zM52 24h1v1h-1zM54 24h1v1h-1zM58 24h1v1h-1zM60 24h1v1h-1zM1 25h5v1h-5zM8 25h1v1h-1zM10 25h1v1h-1zM13 25h3v1h-3zM21 25h1v1h-1zM23 25h1v1h-1zM27 25h1v1h-1zM31 25h2v1h-2zM35 25h1v1h-1zM41 25h2v1h-2zM44 25h1v1h-1zM51 25h1v1h-1zM54 25h1v1h-1zM0 26h1v1h-1zM3 26h1v1h-1zM6 26h6v1h-6zM14 26h1v1h-1zM16 26h5v1h-5zM22 26h2v1h-2zM25 26h2v1h-2zM28 26h2v1h-2zM31 26h2v1h-2zM35 26h4v1h-4zM41 26h2v1h-2zM47 26h1v1h-1zM49 26h3v1h-3zM53 26h1v1h-1zM2 27h2v1h-2zM7 27h1v1h-1zM9 27h6v1h-6zM16 27h1v1h-1zM18 27h2v1h-2zM22 27h3v1h-3zM26 27h1v1h-1zM31 27h1v1h-1zM33 27h1v1h-1zM35 27h1v1h-1zM37 27h1v1h-1zM40 27h3v1h-3zM46 27h6v1h-6zM53 27h5v1h-5zM60 27h1v1h-1zM1 28h2v1h-2zM4 28h7v1h-7zM14 28h2v1h-2zM17 28h1v1h-1zM19 28h2v1h-2zM22 28h2v1h-2zM25 28h1v1h-1zM28 28h5v1h-5zM34 28h1v1h-1zM36 28h1v1h-1zM38 28h2v1h-2zM43 28h6v1h-6zM50 28h9v1h-9zM60 28h1v1h-1zM0 29h1v1h-1zM2 29h1v1h-1zM4 29h1v1h-1zM8 29h2v1h-2zM12 29h1v1h-1zM14 29h1v1h-1zM16 29h1v1h-1zM18 29h1v1h-1zM20 29h1v1h-1zM25 29h4v1h-4zM32 29h1v1h-1zM36 29h1v1h-1zM39 29h1v1h-1zM42 29h1v1h-1zM44 29h1v1h-1zM46 29h4v1h-4zM51 29h2v1h-2zM56 29h2v1h-2zM59 29h1v1h-1zM1 30h2v1h-2zM4 30h1v1h-1zM6 30h1v1h-1zM8 30h4v1h-4zM14 30h1v1h-1zM19 30h1v1h-1zM21 30h1v1h-1zM23 30h1v1h-1zM25 30h1v1h-1zM28 30h1v1h-1zM30 30h1v1h-1zM32 30h1v1h-1zM34 30h6v1h-6zM41 30h1v1h-1zM43 30h3v1h-3zM48 30h2v1h-2zM52 30h1v1h-1zM54 30h1v1h-1zM56 30h3v1h-3zM60 30h1v1h-1zM4 31h1v1h-1zM8 31h1v1h-1zM12 31h2v1h-2zM15 31h1v1h-1zM18 31h1v1h-1zM21 31h1v1h-1zM23 31h1v1h-1zM25 31h4v1h-4zM32 31h3v1h-3zM36 31h2v1h-2zM41 31h1v1h-1zM45 31h1v1h-1zM47 31h1v1h-1zM49 31h4v1h-4zM56 31h1v1h-1zM59 31h1v1h-1zM2 32h1v1h-1zM4 32h5v1h-5zM12 32h1v1h-1zM14 32h1v1h-1zM17 32h1v1h-1zM21 32h2v1h-2zM24 32h1v1h-1zM27 32h11v1h-11zM41 32h1v1h-1zM43 32h1v1h-1zM45 32h2v1h-2zM48 32h2v1h-2zM51 32h6v1h-6zM58 32h1v1h-1zM60 32h1v1h-1zM0 33h2v1h-2zM3 33h2v1h-2zM7 33h2v1h-2zM11 33h1v1h-1zM13 33h2v1h-2zM17 33h4v1h-4zM23 33h2v1h-2zM26 33h1v1h-1zM28 33h1v1h-1zM35 33h3v1h-3zM41 33h3v1h-3zM45 33h1v1h-1zM47 33h3v1h-3zM51 33h1v1h-1zM53 33h2v1h-2zM57 33h1v1h-1zM59 33h2v1h-2zM1 34h1v1h-1zM3 34h2v1h-2zM6 34h2v1h-2zM11 34h1v1h-1zM13 34h5v1h-5zM21 34h2v1h-2zM25 34h3v1h-3zM29 34h1v1h-1zM31 34h3v1h-3zM35 34h2v1h-2zM39 34h1v1h-1zM41 34h2v1h-2zM44 34h1v1h-1zM46 34h1v1h-1zM48 34h1v1h-1zM50 34h5v1h-5zM56 34h1v1h-1zM59 34h2v1h-2zM0 35h3v1h-3zM12 35h4v1h-4zM21 35h2v1h-2zM24 35h2v1h-2zM30 35h1v1h-1zM34 35h2v1h-2zM40 35h2v1h-2zM45 35h2v1h-2zM48 35h2v1h-2zM54 35h2v1h-2zM59 35h2v1h-2zM2 36h1v1h-1zM4 36h3v1h-3zM10 36h2v1h-2zM14 36h1v1h-1zM16 36h1v1h-1zM22 36h2v1h-2zM25 36h2v1h-2zM30 36h3v1h-3zM35 36h5v1h-5zM43 36h1v1h-1zM47 36h1v1h-1zM51 36h7v1h-7zM59 36h2v1h-2zM1 37h2v1h-2zM10 37h1v1h-1zM15 37h1v1h-1zM17 37h1v1h-1zM19 37h2v1h-2zM25 37h3v1h-3zM29 37h1v1h-1zM31 37h1v1h-1zM33 37h2v1h-2zM36 37h2v1h-2zM39 37h1v1h-1zM41 37h1v1h-1zM43 37h1v1h-1zM51 37h3v1h-3zM57 37h2v1h-2zM60 37h1v1h-1zM0 38h1v1h-1zM2 38h3v1h-3zM6 38h1v1h-1zM11 38h1v1h-1zM15 38h2v1h-2zM18 38h1v1h-1zM21 38h1v1h-1zM23 38h2v1h-2zM29 38h1v1h-1zM32 38h1v1h-1zM34 38h1v1h-1zM36 38h2v1h-2zM39 38h1v1h-1zM42 38h1v1h-1zM45 38h1v1h-1zM47 38h1v1h-1zM49 38h6v1h-6zM56 38h2v1h-2zM59 38h2v1h-2zM8 39h3v1h-3zM12 39h1v1h-1zM14 39h7v1h-7zM24 39h5v1h-5zM31 39h1v1h-1zM34 39h2v1h-2zM37 39h1v1h-1zM40 39h7v1h-7zM48 39h1v1h-1zM57 39h1v1h-1zM60 39h1v1h-1zM0 40h2v1h-2zM3 40h2v1h-2zM6 40h1v1h-1zM8 40h1v1h-1zM13 40h1v1h-1zM15 40h2v1h-2zM21 40h2v1h-2zM26 40h1v1h-1zM30 40h5v1h-5zM36 40h4v1h-4zM45 40h1v1h-1zM47 40h2v1h-2zM51 40h1v1h-1zM53 40h2v1h-2zM56 40h5v1h-5zM0 41h2v1h-2zM3 41h3v1h-3zM7 41h1v1h-1zM9 41h2v1h-2zM12 41h1v1h-1zM15 41h1v1h-1zM18 41h4v1h-4zM23 41h3v1h-3zM32 41h2v1h-2zM35 41h2v1h-2zM42 41h2v1h-2zM53 41h2v1h-2zM58 41h2v1h-2zM1 42h2v1h-2zM4 42h3v1h-3zM8 42h1v1h-1zM10 42h4v1h-4zM17 42h1v1h-1zM22 42h1v1h-1zM24 42h6v1h-6zM31 42h1v1h-1zM36 42h3v1h-3zM41 42h1v1h-1zM44 42h3v1h-3zM48 42h4v1h-4zM54 42h3v1h-3zM60 42h1v1h-1zM0 43h2v1h-2zM4 43h1v1h-1zM7 43h11v1h-11zM20 43h2v1h-2zM28 43h1v1h-1zM34 43h5v1h-5zM40 43h1v1h-1zM42 43h4v1h-4zM49 43h2v1h-2zM52 43h2v1h-2zM55 43h2v1h-2zM60 43h1v1h-1zM3 44h1v1h-1zM6 44h3v1h-3zM13 44h4v1h-4zM19 44h5v1h-5zM25 44h4v1h-4zM33 44h2v1h-2zM36 44h1v1h-1zM38 44h1v1h-1zM45 44h2v1h-2zM48 44h4v1h-4zM54 44h4v1h-4zM60 44h1v1h-1zM0 45h3v1h-3zM4 45h2v1h-2zM8 45h1v1h-1zM10 45h2v1h-2zM15 45h1v1h-1zM18 45h1v1h-1zM20 45h1v1h-1zM23 45h1v1h-1zM25 45h1v1h-1zM28 45h1v1h-1zM31 45h2v1h-2zM34 45h7v1h-7zM42 45h2v1h-2zM45 45h1v1h-1zM48 45h2v1h-2zM51 45h2v1h-2zM54 45h1v1h-1zM60 45h1v1h-1zM2 46h2v1h-2zM5 46h2v1h-2zM8 46h3v1h-3zM12 46h2v1h-2zM17 46h1v1h-1zM20 46h1v1h-1zM24 46h1v1h-1zM27 46h5v1h-5zM36 46h1v1h-1zM39 46h1v1h-1zM41 46h1v1h-1zM43 46h1v1h-1zM46 46h4v1h-4zM51 46h1v1h-1zM54 46h1v1h-1zM56 46h5v1h-5zM0 47h1v1h-1zM2 47h1v1h-1zM7 47h1v1h-1zM12 47h1v1h-1zM16 47h4v1h-4zM21 47h1v1h-1zM23 47h2v1h-2zM29 47h7v1h-7zM40 47h2v1h-2zM44 47h1v1h-1zM48 47h1v1h-1zM51 47h3v1h-3zM55 47h3v1h-3zM59 47h2v1h-2zM2 48h1v1h-1zM6 48h4v1h-4zM13 48h2v1h-2zM16 48h2v1h-2zM19 48h1v1h-1zM21 48h4v1h-4zM26 48h1v1h-1zM28 48h1v1h-1zM30 48h3v1h-3zM36 48h1v1h-1zM39 48h1v1h-1zM42 48h2v1h-2zM47 48h3v1h-3zM51 48h3v1h-3zM58 48h3v1h-3zM5 49h1v1h-1zM7 49h1v1h-1zM10 49h1v1h-1zM14 49h2v1h-2zM17 49h2v1h-2zM21 49h1v1h-1zM23 49h2v1h-2zM26 49h1v1h-1zM28 49h1v1h-1zM34 49h1v1h-1zM36 49h1v1h-1zM41 49h3v1h-3zM45 49h1v1h-1zM51 49h5v1h-5zM2 50h6v1h-6zM9 50h1v1h-1zM14 50h1v1h-1zM17 50h1v1h-1zM19 50h2v1h-2zM22 50h1v1h-1zM25 50h1v1h-1zM31 50h1v1h-1zM34 50h1v1h-1zM36 50h3v1h-3zM46 50h1v1h-1zM48 50h3v1h-3zM52 50h1v1h-1zM54 50h2v1h-2zM57 50h1v1h-1zM59 50h2v1h-2zM0 51h3v1h-3zM4 51h1v1h-1zM8 51h4v1h-4zM13 51h2v1h-2zM16 51h2v1h-2zM19 51h1v1h-1zM22 51h3v1h-3zM27 51h2v1h-2zM33 51h1v1h-1zM36 51h1v1h-1zM38 51h1v1h-1zM42 51h3v1h-3zM47 51h1v1h-1zM56 51h2v1h-2zM59 51h1v1h-1zM0 52h4v1h-4zM6 52h1v1h-1zM8 52h2v1h-2zM11 52h3v1h-3zM24 52h3v1h-3zM28 52h6v1h-6zM35 52h3v1h-3zM39 52h1v1h-1zM41 52h1v1h-1zM48 52h2v1h-2zM51 52h6v1h-6zM58 52h3v1h-3zM8 53h3v1h-3zM13 53h4v1h-4zM21 53h1v1h-1zM23 53h2v1h-2zM26 53h3v1h-3zM32 53h1v1h-1zM34 53h4v1h-4zM42 53h1v1h-1zM47 53h2v1h-2zM51 53h2v1h-2zM56 53h2v1h-2zM60 53h1v1h-1zM0 54h7v1h-7zM8 54h4v1h-4zM13 54h2v1h-2zM16 54h2v1h-2zM20 54h1v1h-1zM22 54h1v1h-1zM28 54h1v1h-1zM30 54h1v1h-1zM32 54h1v1h-1zM34 54h1v1h-1zM39 54h1v1h-1zM41 54h1v1h-1zM43 54h1v1h-1zM45 54h1v1h-1zM47 54h3v1h-3zM52 54h1v1h-1zM54 54h1v1h-1zM56 54h2v1h-2zM59 54h2v1h-2zM0 55h1v1h-1zM6 55h1v1h-1zM8 55h2v1h-2zM12 55h1v1h-1zM14 55h7v1h-7zM22 55h2v1h-2zM25 55h4v1h-4zM32 55h3v1h-3zM36 55h1v1h-1zM39 55h1v1h-1zM41 55h5v1h-5zM51 55h2v1h-2zM56 55h2v1h-2zM59 55h1v1h-1zM0 56h1v1h-1zM2 56h3v1h-3zM6 56h1v1h-1zM8 56h1v1h-1zM10 56h1v1h-1zM12 56h3v1h-3zM17 56h1v1h-1zM20 56h1v1h-1zM28 56h9v1h-9zM41 56h1v1h-1zM46 56h1v1h-1zM48 56h1v1h-1zM51 56h6v1h-6zM58 56h1v1h-1zM60 56h1v1h-1zM0 57h1v1h-1zM2 57h3v1h-3zM6 57h1v1h-1zM8 57h3v1h-3zM12 57h2v1h-2zM16 57h1v1h-1zM21 57h2v1h-2zM24 57h3v1h-3zM29 57h6v1h-6zM39 57h5v1h-5zM47 57h1v1h-1zM52 57h3v1h-3zM56 57h1v1h-1zM58 57h1v1h-1zM60 57h1v1h-1zM0 58h1v1h-1zM2 58h3v1h-3zM6 58h1v1h-1zM8 58h1v1h-1zM11 58h2v1h-2zM14 58h1v1h-1zM16 58h1v1h-1zM19 58h4v1h-4zM25 58h2v1h-2zM28 58h1v1h-1zM31 58h3v1h-3zM35 58h1v1h-1zM37 58h3v1h-3zM42 58h1v1h-1zM45 58h1v1h-1zM47 58h1v1h-1zM49 58h3v1h-3zM55 58h1v1h-1zM57 58h2v1h-2zM60 58h1v1h-1zM0 59h1v1h-1zM6 59h1v1h-1zM8 59h1v1h-1zM12 59h2v1h-2zM27 59h1v1h-1zM32 59h1v1h-1zM34 59h2v1h-2zM37 59h1v1h-1zM40 59h1v1h-1zM42 59h2v1h-2zM45 59h1v1h-1zM48 59h1v1h-1zM51 59h1v1h-1zM54 59h2v1h-2zM60 59h1v1h-1zM0 60h7v1h-7zM10 60h1v1h-1zM12 60h1v1h-1zM15 60h2v1h-2zM18 60h2v1h-2zM22 60h2v1h-2zM26 60h1v1h-1zM29 60h1v1h-1zM31 60h1v1h-1zM33 60h2v1h-2zM36 60h2v1h-2zM39 60h1v1h-1zM42 60h1v1h-1zM47 60h2v1h-2zM53 60h1v1h-1zM55 60h1v1h-1zM57 60h1v1h-1zM59 60h2v1h-2z"}};
+  function drawQr(el, key, accent) {
+    var n = QR[key].n, q = 3, size = n + q * 2;
+    var bw = Math.round(n * 0.32), bh = Math.round(n * 0.14), bx = (size - bw) / 2, by = (size - bh) / 2;
+    var svg =
+      '<svg viewBox="0 0 ' + size + " " + size + '" xmlns="http://www.w3.org/2000/svg" shape-rendering="crispEdges" aria-hidden="true">' +
+      '<rect width="100%" height="100%" fill="#fff"/>' +
+      '<path transform="translate(' + q + " " + q + ')" d="' + QR[key].d + '" fill="#111"/>' +
+      '<rect x="' + bx + '" y="' + by + '" width="' + bw + '" height="' + bh + '" rx="1" fill="#fff" stroke="' + accent + '" stroke-width="0.6"/>' +
+      '<text x="' + (size / 2) + '" y="' + (size / 2) + '" text-anchor="middle" dominant-baseline="central" font-family="system-ui,sans-serif" font-weight="900" font-size="' + (bh * 0.62) + '" fill="' + accent + '">DEMO</text>' +
+      "</svg>";
+    el.insertAdjacentHTML("beforeend", svg);
+  }
+  drawQr(document.getElementById("qr-id"), "id", "#c8102e");
+  drawQr(document.getElementById("qr-au"), "au", "#00843d");
+
+  // ---------- Decoder UI ----------
+  var state = { which: "id", open: false, tampered: false };
+  var rawEl = document.getElementById("raw");
+  var decEl = document.getElementById("decoded");
+  var peekBtn = document.getElementById("peek");
+  var tamperBtn = document.getElementById("tamper");
+
+  function currentPayload() {
+    var p = SAMPLES[state.which];
+    if (state.tampered) p = p.replace(tlv("54", TAMPER[state.which][0]), tlv("54", TAMPER[state.which][1]));
+    return p;
+  }
+
+  function render() {
+    var payload = currentPayload();
+    var fields;
+    try { fields = parse(payload); } catch (e) { rawEl.textContent = payload; decEl.textContent = e.message; return; }
+
+    rawEl.innerHTML = fields.map(function (f, i) {
+      var cls = KEY_TAGS[f.id] ? "hl" : (i % 2 ? "alt" : "");
+      return '<span class="' + cls + '" title="Tag ' + f.id + '">' + esc(payload.slice(f.start, f.end)) + "</span>";
+    }).join("");
+
+    document.getElementById("pick-id").setAttribute("aria-pressed", String(state.which === "id"));
+    document.getElementById("pick-au").setAttribute("aria-pressed", String(state.which === "au"));
+    peekBtn.textContent = state.open ? "Hide the decoded blocks" : "🔍 Peek inside the code";
+    tamperBtn.hidden = !state.open;
+    tamperBtn.textContent = state.tampered ? "Put the real price back" : "Change the price without fixing the checksum";
+
+    if (!state.open) { decEl.className = "decoded"; decEl.innerHTML = ""; return; }
+
+    var body = payload.slice(0, payload.length - 4);
+    var expected = crc16(body), given = payload.slice(-4), ok = expected === given;
+
+    var html = '<p class="small muted">' + fields.length + " blocks. Highlighted ones are the four key parts. Each row is tag · length · value.</p>";
+    html += fields.map(function (f) {
+      var info = describe(f.id, f.val, state.which);
+      var isKey = !!KEY_TAGS[f.id];
+      var inner = "";
+      if (TEMPLATES[f.id]) {
+        try {
+          inner = '<div class="sub">' + parse(f.val).map(function (s) {
+            var si = describeSub(f.id, s.id, s.val, state.which);
+            return '<div class="field"><div class="field-top"><span class="field-tag">' + s.id + " · " + pad2(s.len) + '</span><span class="field-name">' + esc(si[0]) + "</span></div>" +
+              '<div class="field-val">' + esc(s.val) + '</div><div class="field-why">' + esc(si[1]) + "</div></div>";
+          }).join("") + "</div>";
+        } catch (e) { inner = ""; }
+      }
+      var shownVal = TEMPLATES[f.id] ? "(" + f.len + " characters of smaller blocks ↓)" : f.val;
+      return '<div class="field' + (isKey ? " key-field" : "") + '"><div class="field-top"><span class="field-tag">' + f.id + " · " + pad2(f.len) + '</span><span class="field-name">' + esc(info.name) + "</span>" +
+        (isKey ? '<span class="field-badge">key part</span>' : "") + "</div>" +
+        '<div class="field-val">' + esc(shownVal) + '</div><div class="field-why">' + esc(info.why) + "</div>" + inner + "</div>";
+    }).join("");
+
+    html += ok
+      ? '<div class="check ok">✓ Checksum matches. The app recalculated ' + expected + " from the text and got the same as tag 63, so it trusts the code.</div>"
+      : '<div class="check bad">✗ Checksum fails. Tag 63 says ' + given + " but the text now works out to " + expected + ". A real app would refuse this code, which is how a sneaky edit to the price gets caught.</div>";
+    if (state.which === "au") html += '<p class="small muted">This Australian code reuses the same EMV QR layout so it can be read the same way. The scheme ID <code>AU.DEMO.PAYID</code> is invented for this page.</p>';
+
+    decEl.innerHTML = html;
+    decEl.className = "decoded open";
+  }
+
+  function pick(which) { state.which = which; state.tampered = false; render(); }
+  document.getElementById("pick-id").addEventListener("click", function () { pick("id"); });
+  document.getElementById("pick-au").addEventListener("click", function () { pick("au"); });
+  peekBtn.addEventListener("click", function () { state.open = !state.open; if (!state.open) state.tampered = false; render(); });
+  tamperBtn.addEventListener("click", function () { state.tampered = !state.tampered; render(); });
+  Array.prototype.forEach.call(document.querySelectorAll("[data-peek]"), function (b) {
+    b.addEventListener("click", function () {
+      state.which = b.getAttribute("data-peek"); state.open = true; state.tampered = false; render();
+      document.getElementById("inside").scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  });
+
+  document.getElementById("copy").addEventListener("click", function () {
+    var ta = document.getElementById("pm"), btn = this;
+    function done() { btn.textContent = "Copied ✓"; setTimeout(function () { btn.textContent = "Copy summary"; }, 1800); }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(done, function () { ta.select(); document.execCommand("copy"); done(); });
+    } else { ta.select(); document.execCommand("copy"); done(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
